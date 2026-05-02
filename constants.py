@@ -4,6 +4,15 @@ Game Constants Configuration
 
 此文件同时支持 Arcade 和 QML 版本
 """
+from enum import IntEnum
+
+# 游戏状态枚举 / Game Status Enum
+class GameStatus(IntEnum):
+    """游戏状态 / Game Status"""
+    NOT_STARTED = 0  # 未开始
+    PLAYING = 1      # 游戏中
+    GAME_OVER = 2    # 游戏失败
+    VICTORY = 3      # 胜利
 
 # 屏幕设置 / Screen Settings
 SCREEN_WIDTH = 800

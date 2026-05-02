@@ -170,8 +170,7 @@ class BreakoutGame(arcade.Window):
 
         # 游戏状态 / Game state
         self.score = 0
-        self.game_over = False
-        self.game_started = False
+        self.game_status = GameStatus.NOT_STARTED
 
     def setup(self):
         """设置游戏（开始或重置）/ Set up the game (start or reset)"""
@@ -223,8 +222,7 @@ class BreakoutGame(arcade.Window):
 
         # 重置游戏状态 / Reset game state
         self.score = 0
-        self.game_over = False
-        self.game_started = False
+        self.game_status = GameStatus.NOT_STARTED
         self.left_pressed = False
         self.right_pressed = False
 
@@ -254,7 +252,7 @@ class BreakoutGame(arcade.Window):
         )
 
         # 如果游戏未开始，显示开始提示 / Show start message if game hasn't started
-        if not self.game_started and not self.game_over:
+        if self.game_status == GameStatus.NOT_STARTED:
             arcade.draw_text(
                 "按空格键开始游戏",
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
@@ -281,7 +279,7 @@ class BreakoutGame(arcade.Window):
             )
 
         # 如果游戏结束，显示提示 / Show game over message
-        if self.game_over:
+        if self.game_status == GameStatus.GAME_OVER:
             arcade.draw_text(
                 "游戏结束！按 R 重新开始",
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
@@ -299,16 +297,35 @@ class BreakoutGame(arcade.Window):
                 font_name="Noto Sans CJK SC"
             )
 
+        # 如果胜利，显示提示 / Show victory message
+        if self.game_status == GameStatus.VICTORY:
+            arcade.draw_text(
+                "恭喜胜利！按 R 重新开始",
+                SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
+                arcade.color.WHITE,
+                30,
+                anchor_x="center",
+                font_name="Noto Sans CJK SC"
+            )
+            arcade.draw_text(
+                "Victory! Press R to Restart",
+                SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40,
+                arcade.color.WHITE,
+                20,
+                anchor_x="center",
+                font_name="Noto Sans CJK SC"
+            )
+
     def on_update(self, delta_time):
         """更新游戏逻辑 / Update game logic"""
 
-        if self.game_over:
+        if self.game_status in (GameStatus.GAME_OVER, GameStatus.VICTORY):
             # 只更新粒子效果 / Only update particle effects
             self.update_particles(delta_time)
             return
 
         # 如果游戏未开始，只允许移动挡板 / If game hasn't started, only allow paddle movement
-        if not self.game_started:
+        if self.game_status == GameStatus.NOT_STARTED:
             # 更新挡板位置 / Update paddle position
             if self.left_pressed:
                 self.paddle.center_x -= PADDLE_SPEED * delta_time
@@ -356,7 +373,7 @@ class BreakoutGame(arcade.Window):
 
         # 球掉落（游戏结束）/ Ball falls (game over)
         if self.ball.center_y < 0:
-            self.game_over = True
+            self.game_status = GameStatus.GAME_OVER
             return
 
         # 球与挡板碰撞 / Ball collision with paddle
@@ -417,10 +434,12 @@ class BreakoutGame(arcade.Window):
             # 增加分数 / Increase score
             self.score += 10
 
-            # 创建爆炸效果 / Create explosion effect
-            self.create_explosion(brick.center_x, brick.center_y, brick.brick_color)
+            # 检测胜利 / Check victory
+            if len(self.brick_list) == 0:
+                self.game_status = GameStatus.VICTORY
 
-            # 只处理第一个碰撞的砖块 / Only handle first collision
+            # 创建爆炸效果 / Create explosion effect
+            self.create_explosion(brick.center_x, brick.center_y, brick.brick_color)            # 只处理第一个碰撞的砖块 / Only handle first collision
             break
 
         # 更新球的彩虹效果 / Update ball rainbow effect
@@ -429,9 +448,26 @@ class BreakoutGame(arcade.Window):
         # 更新粒子效果 / Update particle effects
         self.update_particles(delta_time)
 
-        # 检查胜利条件 / Check win condition
-        if len(self.brick_list) == 0:
-            self.game_over = True
+        # 绘制胜利消息 / Draw victory message
+        if self.game_status == GameStatus.VICTORY:
+            arcade.draw_text(
+                "恭喜胜利! / Victory!",
+                SCREEN_WIDTH / 2,
+                SCREEN_HEIGHT / 2 + 30,
+                arcade.color.WHITE,
+                font_size=48,
+                anchor_x="center",
+                font_name="Noto Sans CJK SC"
+            )
+            arcade.draw_text(
+                "按 R 重新开始 / Press R to restart",
+                SCREEN_WIDTH / 2,
+                SCREEN_HEIGHT / 2 - 30,
+                arcade.color.WHITE,
+                font_size=24,
+                anchor_x="center",
+                font_name="Noto Sans CJK SC"
+            )
 
     def create_explosion(self, x, y, color):
         """创建爆炸粒子效果 / Create explosion particle effect"""
@@ -491,8 +527,8 @@ class BreakoutGame(arcade.Window):
             self.right_pressed = True
         elif key == arcade.key.SPACE:
             # 按空格键开始游戏 / Press space to start game
-            if not self.game_started and not self.game_over:
-                self.game_started = True
+            if self.game_status == GameStatus.NOT_STARTED:
+                self.game_status = GameStatus.PLAYING
                 # 发射球 / Launch ball
                 angle = math.radians(BALL_START_ANGLE)
                 self.ball.change_x = BALL_SPEED * math.cos(angle)
@@ -521,7 +557,7 @@ class BreakoutGame(arcade.Window):
             self.paddle.center_x = SCREEN_WIDTH - PADDLE_WIDTH / 2
 
         # 如果游戏未开始，球跟随挡板 / If game hasn't started, ball follows paddle
-        if not self.game_started and not self.game_over:
+        if self.game_status == GameStatus.NOT_STARTED:
             self.ball.center_x = self.paddle.center_x
 
 

@@ -10,7 +10,7 @@ import colorsys
 import os
 
 # 优先使用 PyQt6
-os.environ.setdefault('QT_API', 'pyqt6')
+# os.environ.setdefault('QT_API', 'pyqt6')
 
 from qtpy.QtCore import QObject, Signal, Slot, Property, QTimer
 from qtpy.QtQml import qmlRegisterType
@@ -27,15 +27,16 @@ class GameState(QObject):
     """游戏状态管理 / Game State Management"""
 
     scoreChanged = Signal(int)
-    gameOverChanged = Signal(bool)
+    gameStatusChanged = Signal(int)
     messageChanged = Signal(str)
-    messageChanged = Signal(str)
+    brickCountChanged = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._score = 0
-        self._game_over = False
+        self._game_status = GameStatus.NOT_STARTED
         self._message = "按空格键开始 / Press SPACE to start"
+        self._brick_count = 0
 
     @Property(int, notify=scoreChanged)
     def score(self):
@@ -47,15 +48,25 @@ class GameState(QObject):
             self._score = value
             self.scoreChanged.emit(value)
 
-    @Property(bool, notify=gameOverChanged)
-    def gameOver(self):
-        return self._game_over
+    @Property(int, notify=gameStatusChanged)
+    def gameStatus(self):
+        return self._game_status
 
-    @gameOver.setter
-    def gameOver(self, value):
-        if self._game_over != value:
-            self._game_over = value
-            self.gameOverChanged.emit(value)
+    @gameStatus.setter
+    def gameStatus(self, value):
+        if self._game_status != value:
+            self._game_status = value
+            self.gameStatusChanged.emit(value)
+
+    @Property(int, notify=brickCountChanged)
+    def brickCount(self):
+        return self._brick_count
+
+    @brickCount.setter
+    def brickCount(self, value):
+        if self._brick_count != value:
+            self._brick_count = value
+            self.brickCountChanged.emit(value)
 
     @Property(str, notify=messageChanged)
     def message(self):
@@ -183,6 +194,10 @@ class GameController(QObject):
         self._state = GameState(self)
         self._ball = Ball(self)
 
+        # 计算总砖块数（菱形布局）
+        total_bricks = sum(5 + row * 2 for row in range(BRICK_ROWS))
+        self._state.brickCount = total_bricks
+
         # 游戏计时器 / Game Timer
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._update)
@@ -201,10 +216,11 @@ class GameController(QObject):
     @Slot()
     def startGame(self):
         """开始游戏 / Start Game"""
-        if not self.timer.isActive():
+        if self._state.gameStatus == GameStatus.NOT_STARTED:
             self._ball.launch()
             self.timer.start()
             self._state.message = ""
+            self._state.gameStatus = GameStatus.PLAYING
 
     @Slot()
     def resetGame(self):
@@ -212,8 +228,12 @@ class GameController(QObject):
         self.timer.stop()
         self._ball.reset()
         self._state.score = 0
-        self._state.gameOver = False
+        self._state.gameStatus = GameStatus.NOT_STARTED
         self._state.message = "按空格键开始 / Press SPACE to start"
+        
+        # 重置砖块计数
+        total_bricks = sum(5 + row * 2 for row in range(BRICK_ROWS))
+        self._state.brickCount = total_bricks
 
     @Slot(float, float, float, result=bool)
     def checkPaddleCollision(self, paddle_x, paddle_y, paddle_width):
@@ -248,6 +268,15 @@ class GameController(QObject):
 
             # 增加分数 / Increase Score
             self._state.score += 10
+            
+            # 减少砖块计数 / Decrease brick count
+            self._state.brickCount -= 1
+            
+            # 检测胜利 / Check Victory
+            if self._state.brickCount <= 0:
+                self.timer.stop()
+                self._state.gameStatus = GameStatus.VICTORY
+                self._state.message = "恭喜胜利! / Victory!\n按 R 重新开始 / Press R to restart"
 
             # 创建爆炸效果 / Create Explosion Effect
             self.requestCreateExplosion.emit(
@@ -266,5 +295,5 @@ class GameController(QObject):
         # 检测掉落 / Check if Ball Fell
         if self._ball.isOutOfBounds():
             self.timer.stop()
-            self._state.gameOver = True
+            self._state.gameStatus = GameStatus.GAME_OVER
             self._state.message = "游戏结束! / Game Over!\n按 R 重新开始 / Press R to restart"

@@ -25,6 +25,11 @@ Window {
         id: colorProvider
     }
 
+    // 游戏状态枚举（从 Python constants 读取）
+    GameStatusProvider {
+        id: gameStatus
+    }
+
     // 游戏控制器（Python 后端）
     GameController {
         id: gameController
@@ -40,7 +45,7 @@ Window {
         focus: true
 
         Keys.onPressed: (event) => {
-            if (event.key === Qt.Key_Space && gameController && gameController.state && !gameController.state.gameOver) {
+            if (event.key === Qt.Key_Space && gameController && gameController.state && gameController.state.gameStatus === gameStatus.NOT_STARTED) {
                 gameController.startGame()
             } else if (event.key === Qt.Key_R) {
                 brickRepeater.model = 0  // 清空砖块
@@ -269,7 +274,7 @@ Window {
             font.pixelSize: 32
             color: "white"
             horizontalAlignment: Text.AlignHCenter
-            visible: gameController && gameController.state && gameController.state.message !== ""
+            visible: gameController && gameController.state && gameController.state.gameStatus !== gameStatus.PLAYING
         }
     }  // 主 Item 结束
 }

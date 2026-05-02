@@ -19,6 +19,7 @@ from qtpy.QtCore import QObject, Property
 
 # 导入游戏逻辑类
 from game_logic_qml import GameState, Ball, GameController, getBrickColors
+from constants import GameStatus
 
 
 class ColorProvider(QObject):
@@ -30,6 +31,27 @@ class ColorProvider(QObject):
     def brickColors(self):
         return getBrickColors()
 
+class GameStatusProvider(QObject):
+    """游戏状态枚举提供器 / Game Status Enum Provider"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    @Property(int, constant=True)
+    def NOT_STARTED(self):
+        return GameStatus.NOT_STARTED
+
+    @Property(int, constant=True)
+    def PLAYING(self):
+        return GameStatus.PLAYING
+
+    @Property(int, constant=True)
+    def GAME_OVER(self):
+        return GameStatus.GAME_OVER
+
+    @Property(int, constant=True)
+    def VICTORY(self):
+        return GameStatus.VICTORY
+
 def main():
     """主程序 / Main Program"""
     app = QGuiApplication(sys.argv)
@@ -39,6 +61,7 @@ def main():
     qmlRegisterType(Ball, 'GameLogic', 1, 0, 'Ball')
     qmlRegisterType(GameController, 'GameLogic', 1, 0, 'GameController')
     qmlRegisterType(ColorProvider, 'GameLogic', 1, 0, 'ColorProvider')
+    qmlRegisterType(GameStatusProvider, 'GameLogic', 1, 0, 'GameStatusProvider')
 
     engine = QQmlApplicationEngine()
 
