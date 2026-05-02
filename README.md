@@ -54,12 +54,24 @@ python main.py
 
 ```
 Breakout/
-├── main.py           # 主游戏文件（包含 RainbowBall 和 BreakoutGame 类）
-├── constants.py      # 游戏常量配置（屏幕、颜色、物理参数等）
+├── main.py           # 主游戏文件（Arcade 版本）
+├── constants.py      # 游戏常量配置
 ├── requirements.txt  # Python 依赖库列表
 ├── README.md         # 项目说明文档
-└── PROGRESS.md       # 开发进度记录
+├── PROGRESS.md       # 开发进度记录
+└── qml_version/      # Qt6 QML 版本（对比学习用）
+    ├── main.py       # QML 版主入口
+    ├── game_logic.py # Python 游戏逻辑层
+    ├── main.qml      # QML UI 界面
+    ├── constants.py  # 常量配置
+    ├── qt_config.py  # Qt 绑定配置（qtpy）
+    ├── requirements.txt
+    └── README.md     # QML 版说明
 ```
+
+> 💡 **提示**: 项目包含两个版本实现，用于学习对比：
+> - **Arcade 版本**（主目录）: 纯 Python，简洁高效，推荐用于学习
+> - **QML 版本**（`qml_version/`）: qtpy (PyQt6/PySide6)，声明式 UI，仅供对比
 
 ## 代码说明 / Code Overview
 

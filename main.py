@@ -62,6 +62,90 @@ class RainbowBall(arcade.Sprite):
         self.color = (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))
 
 
+class RoundedRectBrick(arcade.Sprite):
+    """圆角矩形砖块类 / Rounded Rectangle Brick Class"""
+
+    def __init__(self, width, height, color, radius=5):
+        super().__init__()
+        self.brick_width = width
+        self.brick_height = height
+        self.brick_color = color  # 保存原始颜色
+        self.corner_radius = radius
+
+        # 创建圆角矩形纹理
+        self._create_rounded_rect_texture()
+
+    def _create_rounded_rect_texture(self):
+        """创建带圆角的矩形纹理 / Create rounded rectangle texture"""
+        # 使用更大的尺寸进行超采样，然后缩小以获得更好的抗锯齿效果
+        scale = 4  # 4x 超采样
+        width = int(self.brick_width * scale)
+        height = int(self.brick_height * scale)
+
+        # 创建 PIL 图像
+        image = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+
+        # 绘制圆角矩形（使用缩放后的半径）
+        draw.rounded_rectangle(
+            [0, 0, width - 1, height - 1],
+            radius=self.corner_radius * scale,
+            fill=self.brick_color
+        )
+
+        # 缩小到实际尺寸（提供抗锯齿效果）
+        image = image.resize((int(self.brick_width), int(self.brick_height)), Image.Resampling.LANCZOS)
+
+        # 转换为 Arcade 纹理
+        self.texture = arcade.Texture(image=image, name=f"brick_{id(self)}")
+
+        # 设置碰撞框
+        self.width = self.brick_width
+        self.height = self.brick_height
+
+
+class RoundedRectPaddle(arcade.Sprite):
+    """圆角矩形挡板类 / Rounded Rectangle Paddle Class"""
+
+    def __init__(self, width, height, color, radius=10):
+        super().__init__()
+        self.paddle_width = width
+        self.paddle_height = height
+        self.paddle_color = color
+        self.corner_radius = radius
+
+        # 创建圆角矩形纹理
+        self._create_rounded_rect_texture()
+
+    def _create_rounded_rect_texture(self):
+        """创建带圆角的矩形纹理 / Create rounded rectangle texture"""
+        # 使用更大的尺寸进行超采样，然后缩小以获得更好的抗锯齿效果
+        scale = 4  # 4x 超采样
+        width = int(self.paddle_width * scale)
+        height = int(self.paddle_height * scale)
+
+        # 创建 PIL 图像
+        image = Image.new('RGBA', (width, height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+
+        # 绘制圆角矩形（使用缩放后的半径）
+        draw.rounded_rectangle(
+            [0, 0, width - 1, height - 1],
+            radius=self.corner_radius * scale,
+            fill=self.paddle_color
+        )
+
+        # 缩小到实际尺寸（提供抗锯齿效果）
+        image = image.resize((int(self.paddle_width), int(self.paddle_height)), Image.Resampling.LANCZOS)
+
+        # 转换为 Arcade 纹理
+        self.texture = arcade.Texture(image=image, name=f"paddle_{id(self)}")
+
+        # 设置碰撞框
+        self.width = self.paddle_width
+        self.height = self.paddle_height
+
+
 class BreakoutGame(arcade.Window):
     """主游戏窗口类 / Main Game Window Class"""
 
@@ -94,11 +178,7 @@ class BreakoutGame(arcade.Window):
 
         # 创建挡板 / Create paddle
         self.paddle_list = arcade.SpriteList()
-        self.paddle = arcade.SpriteSolidColor(
-            PADDLE_WIDTH,
-            PADDLE_HEIGHT,
-            COLOR_PADDLE
-        )
+        self.paddle = RoundedRectPaddle(PADDLE_WIDTH, PADDLE_HEIGHT, COLOR_PADDLE, radius=10)
         self.paddle.center_x = SCREEN_WIDTH / 2
         self.paddle.center_y = PADDLE_Y_POSITION
         self.paddle_list.append(self.paddle)
@@ -107,7 +187,7 @@ class BreakoutGame(arcade.Window):
         self.ball_list = arcade.SpriteList()
         self.ball = RainbowBall(BALL_RADIUS)
         self.ball.center_x = SCREEN_WIDTH / 2
-        self.ball.center_y = PADDLE_Y_POSITION + PADDLE_HEIGHT + 20
+        self.ball.center_y = PADDLE_Y_POSITION + PADDLE_HEIGHT / 2 + BALL_RADIUS + 2
         self.ball_list.append(self.ball)
 
         # 设置球的初始速度为0（等待开始）/ Set initial ball velocity to 0 (waiting to start)
@@ -120,12 +200,7 @@ class BreakoutGame(arcade.Window):
         # 生成菱形砖块布局 / Generate diamond-shaped brick layout
         for row in range(BRICK_ROWS):
             # 计算这一行应该有多少砖块（菱形效果）
-            if row < BRICK_ROWS // 2:
-                # 上半部分：逐渐增加砖块数量
-                bricks_in_row = (row + 1) * 2
-            else:
-                # 下半部分：逐渐减少砖块数量
-                bricks_in_row = (BRICK_ROWS - row) * 2
+            bricks_in_row = 5 + row * 2
 
             # 计算这一行的起始偏移，使其居中
             total_row_width = bricks_in_row * BRICK_WIDTH + (bricks_in_row - 1) * BRICK_MARGIN
@@ -135,17 +210,15 @@ class BreakoutGame(arcade.Window):
                 # 选择颜色（根据行数）/ Choose color based on row
                 color = BRICK_COLORS[row % len(BRICK_COLORS)]
 
-                # 创建砖块 / Create brick
-                brick = arcade.SpriteSolidColor(BRICK_WIDTH, BRICK_HEIGHT, color)
+                # 创建圆角砖块 / Create rounded brick
+                brick = RoundedRectBrick(BRICK_WIDTH, BRICK_HEIGHT, color, radius=6)
 
                 # 设置位置（菱形布局）/ Set position (diamond layout)
                 brick.center_x = row_offset + (BRICK_MARGIN + BRICK_WIDTH) * column + BRICK_WIDTH / 2
                 brick.center_y = SCREEN_HEIGHT - BRICK_TOP_MARGIN - (BRICK_MARGIN + BRICK_HEIGHT) * row
 
                 # 添加到列表 / Add to list
-                self.brick_list.append(brick)
-
-        # 重置粒子效果 / Reset particle effects
+                self.brick_list.append(brick)        # 重置粒子效果 / Reset particle effects
         self.particle_list = arcade.SpriteList()
 
         # 重置游戏状态 / Reset game state
@@ -345,7 +418,7 @@ class BreakoutGame(arcade.Window):
             self.score += 10
 
             # 创建爆炸效果 / Create explosion effect
-            self.create_explosion(brick.center_x, brick.center_y, brick.color)
+            self.create_explosion(brick.center_x, brick.center_y, brick.brick_color)
 
             # 只处理第一个碰撞的砖块 / Only handle first collision
             break
@@ -395,7 +468,7 @@ class BreakoutGame(arcade.Window):
             particle.center_y += particle.change_y * delta_time
 
             # 应用重力 / Apply gravity
-            particle.change_y -= 200 * delta_time
+            particle.change_y -= 500 * delta_time
 
             # 淡出效果 / Fade out effect
             fade = 1 - (particle.age / PARTICLE_LIFETIME)
