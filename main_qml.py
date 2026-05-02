@@ -15,18 +15,30 @@ os.environ.setdefault('QT_API', 'pyqt6')
 
 from qtpy.QtGui import QGuiApplication
 from qtpy.QtQml import QQmlApplicationEngine, qmlRegisterType
+from qtpy.QtCore import QObject, Property
 
 # 导入游戏逻辑类
-from game_logic import GameState, Ball, GameController
+from game_logic_qml import GameState, Ball, GameController, getBrickColors
 
+
+class ColorProvider(QObject):
+    """颜色提供器 / Color Provider"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+    @Property(list, constant=True)
+    def brickColors(self):
+        return getBrickColors()
 
 def main():
+    """主程序 / Main Program"""
     app = QGuiApplication(sys.argv)
 
-    # 手动注册 QML 类型
-    qmlRegisterType(GameState, "GameLogic", 1, 0, "GameState")
-    qmlRegisterType(Ball, "GameLogic", 1, 0, "Ball")
-    qmlRegisterType(GameController, "GameLogic", 1, 0, "GameController")
+    # 注册 QML 类型
+    qmlRegisterType(GameState, 'GameLogic', 1, 0, 'GameState')
+    qmlRegisterType(Ball, 'GameLogic', 1, 0, 'Ball')
+    qmlRegisterType(GameController, 'GameLogic', 1, 0, 'GameController')
+    qmlRegisterType(ColorProvider, 'GameLogic', 1, 0, 'ColorProvider')
 
     engine = QQmlApplicationEngine()
 

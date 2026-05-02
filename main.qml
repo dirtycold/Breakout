@@ -20,6 +20,11 @@ Window {
         return count
     }
 
+    // 颜色提供器（从 Python constants 读取）
+    ColorProvider {
+        id: colorProvider
+    }
+
     // 游戏控制器（Python 后端）
     GameController {
         id: gameController
@@ -107,9 +112,8 @@ Window {
                     brick.x = start_x + posInRow * (55 + 4)
                     brick.y = 80 + currentRow * (25 + 4)
 
-                    // 设置颜色
-                    let colors = ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF", "#9D4EDD"]
-                    brick.color = colors[currentRow % colors.length]
+                    // 设置颜色（从 Python constants 读取）
+                    brick.color = colorProvider.brickColors[currentRow % colorProvider.brickColors.length]
                 }
 
                 // 碰撞检测（每帧）
@@ -253,6 +257,7 @@ Window {
             anchors.left: parent.left
             anchors.margins: 20
             text: gameController && gameController.state ? "分数 Score: " + gameController.state.score : "分数 Score: 0"
+            font.family: "Noto Sans CJK SC"
             font.pixelSize: 24
             color: "white"
         }
@@ -260,6 +265,7 @@ Window {
         Text {
             anchors.centerIn: parent
             text: gameController && gameController.state ? gameController.state.message : ""
+            font.family: "Noto Sans CJK SC"
             font.pixelSize: 32
             color: "white"
             horizontalAlignment: Text.AlignHCenter

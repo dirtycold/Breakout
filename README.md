@@ -1,22 +1,46 @@
 # DX-Ball Clone - 打砖块游戏
 
-简单的打砖块游戏，使用 Python Arcade 开发，适合小朋友学习。
+简单的打砖块游戏，提供 **Arcade** 和 **QML** 两个版本实现，适合学习对比。
+
+## 版本说明 / Versions
+
+### 🎮 Arcade 版本（推荐）
+- 纯 Python 实现
+- 使用 Arcade 游戏引擎
+- 代码简洁，适合学习
+
+### 🖼️ QML 版本
+- Python (逻辑) + QML (UI)
+- 使用 Qt6，支持 PyQt6/PySide6
+- MVC 架构，声明式 UI
 
 ## 安装依赖 / Installation
 
+### Arcade 版本
 ```bash
 pip install -r requirements.txt
 ```
 
+### QML 版本
+```bash
+pip install -r requirements_qml.txt
+```
+
 或手动安装：
 ```bash
-pip install arcade pillow
+pip install qtpy PyQt6
 ```
 
 ## 运行游戏 / Run the Game
 
+### Arcade 版本
 ```bash
-python main.py
+python main_arcade.py
+```
+
+### QML 版本
+```bash
+python main_qml.py
 ```
 
 ## 游戏操作 / Controls
@@ -54,24 +78,19 @@ python main.py
 
 ```
 Breakout/
-├── main.py           # 主游戏文件（Arcade 版本）
-├── constants.py      # 游戏常量配置
-├── requirements.txt  # Python 依赖库列表
-├── README.md         # 项目说明文档
-├── PROGRESS.md       # 开发进度记录
-└── qml_version/      # Qt6 QML 版本（对比学习用）
-    ├── main.py       # QML 版主入口
-    ├── game_logic.py # Python 游戏逻辑层
-    ├── main.qml      # QML UI 界面
-    ├── constants.py  # 常量配置
-    ├── qt_config.py  # Qt 绑定配置（qtpy）
-    ├── requirements.txt
-    └── README.md     # QML 版说明
+├── main_arcade.py       # Arcade 版本主程序
+├── main_qml.py          # QML 版本主程序
+├── game_logic_qml.py    # QML 游戏逻辑层（Python）
+├── main.qml             # QML UI 界面
+├── constants.py         # 共享常量配置
+├── qt_config.py         # Qt 绑定配置（qtpy）
+├── requirements.txt     # Arcade 依赖
+├── requirements_qml.txt # QML 依赖
+├── README.md            # 项目说明文档
+└── PROGRESS.md          # 开发进度记录
 ```
 
-> 💡 **提示**: 项目包含两个版本实现，用于学习对比：
-> - **Arcade 版本**（主目录）: 纯 Python，简洁高效，推荐用于学习
-> - **QML 版本**（`qml_version/`）: qtpy (PyQt6/PySide6)，声明式 UI，仅供对比
+> 💡 **提示**: 两个版本共享 `constants.py`，实现完全一致的游戏体验
 
 ## 代码说明 / Code Overview
 

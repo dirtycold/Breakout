@@ -1,19 +1,22 @@
 """
 游戏常量配置
 Game Constants Configuration
+
+此文件同时支持 Arcade 和 QML 版本
 """
 
 # 屏幕设置 / Screen Settings
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 SCREEN_TITLE = "DX-Ball Clone - 打砖块游戏"
+SCREEN_TITLE_QML = "DX-Ball Clone (QML版) - 打砖块游戏"
 
 # 颜色定义 / Color Definitions
 COLOR_BACKGROUND = (26, 26, 46)  # #1A1A2E
 COLOR_PADDLE = (52, 152, 219)  # #3498DB
 COLOR_BALL = (255, 255, 255)
 
-# 砖块颜色 / Brick Colors
+# 砖块颜色 / Brick Colors (Arcade RGB 格式)
 BRICK_COLORS = [
     (255, 107, 107),  # 红色 Red #FF6B6B
     (255, 217, 61),   # 黄色 Yellow #FFD93D
@@ -21,6 +24,17 @@ BRICK_COLORS = [
     (77, 150, 255),   # 蓝色 Blue #4D96FF
     (157, 78, 221),   # 紫色 Purple #9D4EDD
 ]
+
+# 砖块颜色 (QML 十六进制格式)
+BRICK_COLORS_HEX = [
+    "#FF6B6B",  # 红色 Red
+    "#FFD93D",  # 黄色 Yellow
+    "#6BCB77",  # 绿色 Green
+    "#4D96FF",  # 蓝色 Blue
+    "#9D4EDD",  # 紫色 Purple
+]
+COLOR_BACKGROUND_HEX = "#1A1A2E"
+COLOR_PADDLE_HEX = "#3498DB"
 
 # 挡板设置 / Paddle Settings
 PADDLE_WIDTH = 100

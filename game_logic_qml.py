@@ -17,6 +17,11 @@ from qtpy.QtQml import qmlRegisterType
 
 from constants import *
 
+# 导出颜色列表供 QML 使用
+def getBrickColors():
+    """获取砖块颜色列表（HEX 格式）/ Get Brick Colors (HEX format)"""
+    return BRICK_COLORS_HEX
+
 
 class GameState(QObject):
     """游戏状态管理 / Game State Management"""
@@ -96,13 +101,13 @@ class Ball(QObject):
 
     @Slot(float)
     def update(self, delta_time):
-        """更新球位置 / Update Ball Position"""
+        """更新球的位置 / Update Ball Position"""
         if not self._active:
             return
 
-        # 更新位置
-        self._x += self._dx
-        self._y += self._dy
+        # 更新位置（乘以 delta_time 控制速度）
+        self._x += self._dx * delta_time
+        self._y += self._dy * delta_time
 
         # 边界碰撞 / Boundary Collision
         if self._x - BALL_RADIUS <= 0 or self._x + BALL_RADIUS >= SCREEN_WIDTH:
