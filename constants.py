@@ -20,6 +20,10 @@ SCREEN_HEIGHT = 600
 SCREEN_TITLE = "DX-Ball Clone - 打砖块游戏"
 SCREEN_TITLE_QML = "DX-Ball Clone (QML版) - 打砖块游戏"
 
+# 计时设置 / Timing Settings
+FRAME_INTERVAL_MS = 16
+FIXED_DELTA_TIME = FRAME_INTERVAL_MS / 1000
+
 # 颜色定义 / Color Definitions
 COLOR_BACKGROUND = (26, 26, 46)  # #1A1A2E
 COLOR_PADDLE = (52, 152, 219)  # #3498DB
@@ -49,23 +53,91 @@ COLOR_PADDLE_HEX = "#3498DB"
 PADDLE_WIDTH = 100
 PADDLE_HEIGHT = 20
 PADDLE_SPEED = 500  # 像素/秒 pixels/second
-PADDLE_Y_POSITION = 50  # 距离底部的高度
+PADDLE_Y_POSITION = 50  # 挡板中心距离底部的高度
+PADDLE_CORNER_RADIUS = 10
+PADDLE_BOUNCE_MAX_ANGLE = 60
 
 # 球设置 / Ball Settings
 BALL_RADIUS = 10
+BALL_DIAMETER = BALL_RADIUS * 2
 BALL_SPEED = 300  # 像素/秒 pixels/second
 BALL_START_ANGLE = 60  # 初始发射角度（度）
+BALL_PADDLE_GAP = 2
 
 # 砖块设置 / Brick Settings
 BRICK_WIDTH = 55
 BRICK_HEIGHT = 25
 BRICK_MARGIN = 4
 BRICK_ROWS = 5
+BRICK_BASE_COUNT = 5
+BRICK_ROW_INCREMENT = 2
 BRICK_COLUMNS = 10  # 不再使用，改为菱形布局
 BRICK_TOP_MARGIN = 80  # 距离顶部的距离
 BRICK_LEFT_MARGIN = 30  # 距离左侧的距离
+BRICK_CORNER_RADIUS = 6
+SCORE_PER_BRICK = 10
 
 # 视觉效果 / Visual Effects
 PARTICLE_COUNT = 15  # 爆炸粒子数量
+PARTICLE_RADIUS = 3
+PARTICLE_MIN_SPEED = 50
+PARTICLE_MAX_SPEED = 150
+PARTICLE_GRAVITY = 500
 PARTICLE_LIFETIME = 1.0  # 粒子存活时间（秒）
 RAINBOW_SPEED = 0.5  # 彩虹渐变速度
+
+
+def bricks_in_row(row):
+    """返回指定行的砖块数 / Return brick count for a row."""
+    return BRICK_BASE_COUNT + row * BRICK_ROW_INCREMENT
+
+
+def total_brick_count():
+    """返回当前布局的总砖块数 / Return total brick count."""
+    return sum(bricks_in_row(row) for row in range(BRICK_ROWS))
+
+
+def brick_row_width(row):
+    """返回指定行的总宽度 / Return total row width."""
+    count = bricks_in_row(row)
+    return count * BRICK_WIDTH + (count - 1) * BRICK_MARGIN
+
+
+def brick_row_left_x(row, screen_width=SCREEN_WIDTH):
+    """返回指定行左侧起点 / Return left edge for a centered row."""
+    return (screen_width - brick_row_width(row)) / 2
+
+
+def arcade_brick_center_x(row, column, screen_width=SCREEN_WIDTH):
+    """Arcade 坐标系下砖块中心 x / Brick center x in Arcade coordinates."""
+    return brick_row_left_x(row, screen_width) + (BRICK_WIDTH + BRICK_MARGIN) * column + BRICK_WIDTH / 2
+
+
+def arcade_brick_center_y(row):
+    """Arcade 坐标系下砖块中心 y / Brick center y in Arcade coordinates."""
+    return SCREEN_HEIGHT - BRICK_TOP_MARGIN - (BRICK_HEIGHT + BRICK_MARGIN) * row
+
+
+def qml_brick_x(row, column, screen_width=SCREEN_WIDTH):
+    """QML 坐标系下砖块左上角 x / Brick x in QML coordinates."""
+    return brick_row_left_x(row, screen_width) + (BRICK_WIDTH + BRICK_MARGIN) * column
+
+
+def qml_brick_y(row):
+    """QML 坐标系下砖块左上角 y / Brick y in QML coordinates."""
+    return SCREEN_HEIGHT - arcade_brick_center_y(row) - BRICK_HEIGHT / 2
+
+
+def arcade_ball_start_center_y():
+    """Arcade 坐标系下球的初始中心 y / Ball start center y in Arcade coordinates."""
+    return PADDLE_Y_POSITION + PADDLE_HEIGHT / 2 + BALL_RADIUS + BALL_PADDLE_GAP
+
+
+def qml_ball_start_center_y():
+    """QML 坐标系下球的初始中心 y / Ball start center y in QML coordinates."""
+    return SCREEN_HEIGHT - arcade_ball_start_center_y()
+
+
+def qml_paddle_y():
+    """QML 坐标系下挡板左上角 y / Paddle y in QML coordinates."""
+    return SCREEN_HEIGHT - (PADDLE_Y_POSITION + PADDLE_HEIGHT / 2)

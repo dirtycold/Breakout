@@ -7,13 +7,11 @@ Game Logic Layer (Python Backend)
 """
 import math
 import colorsys
-import os
 
 # 优先使用 PyQt6
 # os.environ.setdefault('QT_API', 'pyqt6')
 
 from qtpy.QtCore import QObject, Signal, Slot, Property, QTimer
-from qtpy.QtQml import qmlRegisterType
 
 from constants import *
 
@@ -88,7 +86,7 @@ class Ball(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._x = SCREEN_WIDTH / 2
-        self._y = SCREEN_HEIGHT - 70 - BALL_RADIUS - 2  # 挡板上方（y=518）
+        self._y = qml_ball_start_center_y()
         self._dx = 0
         self._dy = 0
         self._active = False
@@ -150,12 +148,14 @@ class Ball(QObject):
 
             # 计算反弹角度 / Calculate Bounce Angle
             hit_pos = (self._x - paddle_x) / paddle_width  # 0.0 到 1.0
-            angle = -60 + (hit_pos * 120)  # -60° 到 +60°
+            angle = -PADDLE_BOUNCE_MAX_ANGLE + (hit_pos * PADDLE_BOUNCE_MAX_ANGLE * 2)
             angle_rad = math.radians(angle)
 
             speed = math.sqrt(self._dx**2 + self._dy**2)
             self._dx = speed * math.sin(angle_rad)
             self._dy = -abs(speed * math.cos(angle_rad))  # 向上为负
+            self._y = paddle_y - BALL_RADIUS
+            self.positionChanged.emit(self._x, self._y)
 
             return True
         return False
@@ -169,7 +169,7 @@ class Ball(QObject):
     def reset(self):
         """重置球 / Reset Ball"""
         self._x = SCREEN_WIDTH / 2
-        self._y = SCREEN_HEIGHT - 70 - BALL_RADIUS - 2
+        self._y = qml_ball_start_center_y()
         self._dx = 0
         self._dy = 0
         self._active = False
@@ -180,7 +180,7 @@ class Ball(QObject):
         """球跟随挡板移动（游戏未开始时）/ Ball follows paddle"""
         if not self._active:
             self._x = paddle_x + paddle_width / 2
-            self._y = SCREEN_HEIGHT - 70 - BALL_RADIUS - 2  # 挡板正上方
+            self._y = qml_ball_start_center_y()
             self.positionChanged.emit(self._x, self._y)
 
 
@@ -194,14 +194,12 @@ class GameController(QObject):
         self._state = GameState(self)
         self._ball = Ball(self)
 
-        # 计算总砖块数（菱形布局）
-        total_bricks = sum(5 + row * 2 for row in range(BRICK_ROWS))
-        self._state.brickCount = total_bricks
+        self._state.brickCount = total_brick_count()
 
         # 游戏计时器 / Game Timer
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._update)
-        self.timer.setInterval(16)  # ~60 FPS
+        self.timer.setInterval(FRAME_INTERVAL_MS)  # ~60 FPS
 
     @Property(QObject, constant=True)
     def state(self):
@@ -232,17 +230,21 @@ class GameController(QObject):
         self._state.message = "按空格键开始 / Press SPACE to start"
         
         # 重置砖块计数
-        total_bricks = sum(5 + row * 2 for row in range(BRICK_ROWS))
-        self._state.brickCount = total_bricks
+        self._state.brickCount = total_brick_count()
 
     @Slot(float, float, float, result=bool)
     def checkPaddleCollision(self, paddle_x, paddle_y, paddle_width):
         """检测挡板碰撞 / Check Paddle Collision"""
+        if self._state.gameStatus != GameStatus.PLAYING:
+            return False
         return self._ball.checkPaddleCollision(paddle_x, paddle_y, paddle_width)
 
     @Slot(float, float, float, float, str, result=bool)
     def checkBrickCollision(self, brick_x, brick_y, brick_width, brick_height, brick_color):
         """检测砖块碰撞 / Check Brick Collision"""
+        if self._state.gameStatus != GameStatus.PLAYING:
+            return False
+
         ball_x = self._ball.x
         ball_y = self._ball.y
 
@@ -254,20 +256,30 @@ class GameController(QObject):
 
         if distance < BALL_RADIUS:
             # 计算碰撞方向 / Calculate Collision Direction
-            overlap_left = (ball_x + BALL_RADIUS) - brick_x
-            overlap_right = (brick_x + brick_width) - (ball_x - BALL_RADIUS)
-            overlap_top = (ball_y + BALL_RADIUS) - brick_y
-            overlap_bottom = (brick_y + brick_height) - (ball_y - BALL_RADIUS)
+            brick_center_x = brick_x + brick_width / 2
+            brick_center_y = brick_y + brick_height / 2
+            dx = ball_x - brick_center_x
+            dy = ball_y - brick_center_y
+            overlap_x = brick_width / 2 + BALL_RADIUS - abs(dx)
+            overlap_y = brick_height / 2 + BALL_RADIUS - abs(dy)
 
-            min_overlap = min(overlap_left, overlap_right, overlap_top, overlap_bottom)
-
-            if min_overlap in (overlap_left, overlap_right):
+            if overlap_x < overlap_y:
                 self._ball._dx = -self._ball._dx
+                if dx > 0:
+                    self._ball._x = brick_center_x + brick_width / 2 + BALL_RADIUS
+                else:
+                    self._ball._x = brick_center_x - brick_width / 2 - BALL_RADIUS
             else:
                 self._ball._dy = -self._ball._dy
+                if dy > 0:
+                    self._ball._y = brick_center_y + brick_height / 2 + BALL_RADIUS
+                else:
+                    self._ball._y = brick_center_y - brick_height / 2 - BALL_RADIUS
+
+            self._ball.positionChanged.emit(self._ball.x, self._ball.y)
 
             # 增加分数 / Increase Score
-            self._state.score += 10
+            self._state.score += SCORE_PER_BRICK
             
             # 减少砖块计数 / Decrease brick count
             self._state.brickCount -= 1
@@ -290,7 +302,7 @@ class GameController(QObject):
 
     def _update(self):
         """游戏主循环 / Main Game Loop"""
-        self._ball.update(0.016)  # 约 60 FPS
+        self._ball.update(FIXED_DELTA_TIME)  # 约 60 FPS
 
         # 检测掉落 / Check if Ball Fell
         if self._ball.isOutOfBounds():

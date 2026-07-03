@@ -47,16 +47,13 @@ class RainbowBall(arcade.Sprite):
         self.width = self.radius * 2
         self.height = self.radius * 2
 
-    def update_animation(self, delta_time=1/60):
+    def update_animation(self, delta_time=FIXED_DELTA_TIME):
         """更新彩虹颜色 / Update rainbow color"""
-        self.rainbow_phase += RAINBOW_SPEED * delta_time
+        self.rainbow_phase = (self.rainbow_phase + RAINBOW_SPEED * delta_time) % 1.0
 
         # 使用HSV色彩空间创建彩虹效果
         # Using HSV color space to create rainbow effect
-        hue = (self.rainbow_phase * 60) % 360  # 0-360度
-
-        # 转换HSV到RGB (hue: 0-360, saturation: 0-1, value: 0-1)
-        rgb = colorsys.hsv_to_rgb(hue / 360.0, 1.0, 1.0)
+        rgb = colorsys.hsv_to_rgb(self.rainbow_phase, 1.0, 1.0)
 
         # 转换为0-255范围的整数
         self.color = (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))
@@ -65,7 +62,7 @@ class RainbowBall(arcade.Sprite):
 class RoundedRectBrick(arcade.Sprite):
     """圆角矩形砖块类 / Rounded Rectangle Brick Class"""
 
-    def __init__(self, width, height, color, radius=5):
+    def __init__(self, width, height, color, radius=BRICK_CORNER_RADIUS):
         super().__init__()
         self.brick_width = width
         self.brick_height = height
@@ -107,7 +104,7 @@ class RoundedRectBrick(arcade.Sprite):
 class RoundedRectPaddle(arcade.Sprite):
     """圆角矩形挡板类 / Rounded Rectangle Paddle Class"""
 
-    def __init__(self, width, height, color, radius=10):
+    def __init__(self, width, height, color, radius=PADDLE_CORNER_RADIUS):
         super().__init__()
         self.paddle_width = width
         self.paddle_height = height
@@ -177,7 +174,7 @@ class BreakoutGame(arcade.Window):
 
         # 创建挡板 / Create paddle
         self.paddle_list = arcade.SpriteList()
-        self.paddle = RoundedRectPaddle(PADDLE_WIDTH, PADDLE_HEIGHT, COLOR_PADDLE, radius=10)
+        self.paddle = RoundedRectPaddle(PADDLE_WIDTH, PADDLE_HEIGHT, COLOR_PADDLE, radius=PADDLE_CORNER_RADIUS)
         self.paddle.center_x = SCREEN_WIDTH / 2
         self.paddle.center_y = PADDLE_Y_POSITION
         self.paddle_list.append(self.paddle)
@@ -186,7 +183,7 @@ class BreakoutGame(arcade.Window):
         self.ball_list = arcade.SpriteList()
         self.ball = RainbowBall(BALL_RADIUS)
         self.ball.center_x = SCREEN_WIDTH / 2
-        self.ball.center_y = PADDLE_Y_POSITION + PADDLE_HEIGHT / 2 + BALL_RADIUS + 2
+        self.ball.center_y = arcade_ball_start_center_y()
         self.ball_list.append(self.ball)
 
         # 设置球的初始速度为0（等待开始）/ Set initial ball velocity to 0 (waiting to start)
@@ -199,25 +196,23 @@ class BreakoutGame(arcade.Window):
         # 生成菱形砖块布局 / Generate diamond-shaped brick layout
         for row in range(BRICK_ROWS):
             # 计算这一行应该有多少砖块（菱形效果）
-            bricks_in_row = 5 + row * 2
+            row_brick_count = bricks_in_row(row)
 
-            # 计算这一行的起始偏移，使其居中
-            total_row_width = bricks_in_row * BRICK_WIDTH + (bricks_in_row - 1) * BRICK_MARGIN
-            row_offset = (SCREEN_WIDTH - total_row_width) / 2
-
-            for column in range(bricks_in_row):
+            for column in range(row_brick_count):
                 # 选择颜色（根据行数）/ Choose color based on row
                 color = BRICK_COLORS[row % len(BRICK_COLORS)]
 
                 # 创建圆角砖块 / Create rounded brick
-                brick = RoundedRectBrick(BRICK_WIDTH, BRICK_HEIGHT, color, radius=6)
+                brick = RoundedRectBrick(BRICK_WIDTH, BRICK_HEIGHT, color, radius=BRICK_CORNER_RADIUS)
 
                 # 设置位置（菱形布局）/ Set position (diamond layout)
-                brick.center_x = row_offset + (BRICK_MARGIN + BRICK_WIDTH) * column + BRICK_WIDTH / 2
-                brick.center_y = SCREEN_HEIGHT - BRICK_TOP_MARGIN - (BRICK_MARGIN + BRICK_HEIGHT) * row
+                brick.center_x = arcade_brick_center_x(row, column)
+                brick.center_y = arcade_brick_center_y(row)
 
                 # 添加到列表 / Add to list
-                self.brick_list.append(brick)        # 重置粒子效果 / Reset particle effects
+                self.brick_list.append(brick)
+
+        # 重置粒子效果 / Reset particle effects
         self.particle_list = arcade.SpriteList()
 
         # 重置游戏状态 / Reset game state
@@ -372,7 +367,7 @@ class BreakoutGame(arcade.Window):
             self.ball.change_y = -abs(self.ball.change_y)
 
         # 球掉落（游戏结束）/ Ball falls (game over)
-        if self.ball.center_y < 0:
+        if self.ball.center_y - BALL_RADIUS <= 0:
             self.game_status = GameStatus.GAME_OVER
             return
 
@@ -383,7 +378,7 @@ class BreakoutGame(arcade.Window):
             relative_hit = max(-1, min(1, relative_hit))  # 限制在 -1 到 1 之间
 
             # 根据击中位置调整反弹角度 / Adjust bounce angle based on hit position
-            angle = relative_hit * 60  # 最大偏转 60 度
+            angle = relative_hit * PADDLE_BOUNCE_MAX_ANGLE
             angle_rad = math.radians(angle)
 
             speed = math.sqrt(self.ball.change_x**2 + self.ball.change_y**2)
@@ -432,14 +427,15 @@ class BreakoutGame(arcade.Window):
             brick.remove_from_sprite_lists()
 
             # 增加分数 / Increase score
-            self.score += 10
+            self.score += SCORE_PER_BRICK
 
             # 检测胜利 / Check victory
             if len(self.brick_list) == 0:
                 self.game_status = GameStatus.VICTORY
 
             # 创建爆炸效果 / Create explosion effect
-            self.create_explosion(brick.center_x, brick.center_y, brick.brick_color)            # 只处理第一个碰撞的砖块 / Only handle first collision
+            self.create_explosion(brick.center_x, brick.center_y, brick.brick_color)
+            # 只处理第一个碰撞的砖块 / Only handle first collision
             break
 
         # 更新球的彩虹效果 / Update ball rainbow effect
@@ -448,39 +444,18 @@ class BreakoutGame(arcade.Window):
         # 更新粒子效果 / Update particle effects
         self.update_particles(delta_time)
 
-        # 绘制胜利消息 / Draw victory message
-        if self.game_status == GameStatus.VICTORY:
-            arcade.draw_text(
-                "恭喜胜利! / Victory!",
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 + 30,
-                arcade.color.WHITE,
-                font_size=48,
-                anchor_x="center",
-                font_name="Noto Sans CJK SC"
-            )
-            arcade.draw_text(
-                "按 R 重新开始 / Press R to restart",
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 - 30,
-                arcade.color.WHITE,
-                font_size=24,
-                anchor_x="center",
-                font_name="Noto Sans CJK SC"
-            )
-
     def create_explosion(self, x, y, color):
         """创建爆炸粒子效果 / Create explosion particle effect"""
 
         for _ in range(PARTICLE_COUNT):
             # 随机速度 / Random velocity
             angle = random.uniform(0, 2 * math.pi)
-            speed = random.uniform(50, 150)
+            speed = random.uniform(PARTICLE_MIN_SPEED, PARTICLE_MAX_SPEED)
             velocity_x = math.cos(angle) * speed
             velocity_y = math.sin(angle) * speed
 
             # 创建粒子 / Create particle
-            particle = arcade.SpriteCircle(3, color)
+            particle = arcade.SpriteCircle(PARTICLE_RADIUS, color)
             particle.center_x = x
             particle.center_y = y
             particle.change_x = velocity_x
@@ -504,7 +479,7 @@ class BreakoutGame(arcade.Window):
             particle.center_y += particle.change_y * delta_time
 
             # 应用重力 / Apply gravity
-            particle.change_y -= 500 * delta_time
+            particle.change_y -= PARTICLE_GRAVITY * delta_time
 
             # 淡出效果 / Fade out effect
             fade = 1 - (particle.age / PARTICLE_LIFETIME)
