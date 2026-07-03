@@ -239,7 +239,7 @@ class BreakoutGame(arcade.Window):
 
         # 绘制分数 / Draw score
         arcade.draw_text(
-            f"分数 Score: {self.score}",
+            f"{SCORE_LABEL}: {self.score}",
             10, SCREEN_HEIGHT - 30,
             arcade.color.WHITE,
             20,
@@ -249,7 +249,7 @@ class BreakoutGame(arcade.Window):
         # 如果游戏未开始，显示开始提示 / Show start message if game hasn't started
         if self.game_status == GameStatus.NOT_STARTED:
             arcade.draw_text(
-                "按空格键开始游戏",
+                MESSAGE_START_LINES[0],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
                 arcade.color.WHITE,
                 30,
@@ -257,7 +257,7 @@ class BreakoutGame(arcade.Window):
                 font_name="Noto Sans CJK SC"
             )
             arcade.draw_text(
-                "Press SPACE to Start",
+                MESSAGE_START_LINES[1],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40,
                 arcade.color.WHITE,
                 20,
@@ -265,7 +265,7 @@ class BreakoutGame(arcade.Window):
                 font_name="Noto Sans CJK SC"
             )
             arcade.draw_text(
-                "← → 移动挡板 / Move Paddle",
+                MESSAGE_START_LINES[2],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 80,
                 arcade.color.WHITE,
                 16,
@@ -276,7 +276,7 @@ class BreakoutGame(arcade.Window):
         # 如果游戏结束，显示提示 / Show game over message
         if self.game_status == GameStatus.GAME_OVER:
             arcade.draw_text(
-                "游戏结束！按 R 重新开始",
+                MESSAGE_GAME_OVER_LINES[0],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
                 arcade.color.WHITE,
                 30,
@@ -284,7 +284,7 @@ class BreakoutGame(arcade.Window):
                 font_name="Noto Sans CJK SC"
             )
             arcade.draw_text(
-                "Game Over! Press R to Restart",
+                MESSAGE_GAME_OVER_LINES[1],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40,
                 arcade.color.WHITE,
                 20,
@@ -295,7 +295,7 @@ class BreakoutGame(arcade.Window):
         # 如果胜利，显示提示 / Show victory message
         if self.game_status == GameStatus.VICTORY:
             arcade.draw_text(
-                "恭喜胜利！按 R 重新开始",
+                MESSAGE_VICTORY_LINES[0],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
                 arcade.color.WHITE,
                 30,
@@ -303,7 +303,7 @@ class BreakoutGame(arcade.Window):
                 font_name="Noto Sans CJK SC"
             )
             arcade.draw_text(
-                "Victory! Press R to Restart",
+                MESSAGE_VICTORY_LINES[1],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40,
                 arcade.color.WHITE,
                 20,

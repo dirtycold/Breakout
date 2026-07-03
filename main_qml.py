@@ -82,6 +82,10 @@ class GameConfigProvider(QObject):
     def ballColor(self):
         return "#%02x%02x%02x" % COLOR_BALL
 
+    @Property(str, constant=True)
+    def scoreLabel(self):
+        return SCORE_LABEL
+
     @Property(int, constant=True)
     def frameIntervalMs(self):
         return FRAME_INTERVAL_MS

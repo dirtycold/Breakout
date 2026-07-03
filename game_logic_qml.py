@@ -242,7 +242,7 @@ class GameState(QObject):
         super().__init__(parent)
         self._score = 0
         self._game_status = GameStatus.NOT_STARTED
-        self._message = "按空格键开始 / Press SPACE to start"
+        self._message = MESSAGE_START
         self._brick_count = 0
 
     @Property(int, notify=scoreChanged)
@@ -451,7 +451,7 @@ class GameController(QObject):
         self._particle_model.clear()
         self._state.score = 0
         self._state.gameStatus = GameStatus.NOT_STARTED
-        self._state.message = "按空格键开始 / Press SPACE to start"
+        self._state.message = MESSAGE_START
         
         # 重置砖块计数
         self._state.brickCount = total_brick_count()
@@ -485,7 +485,7 @@ class GameController(QObject):
 
                 if self._state.brickCount <= 0:
                     self._state.gameStatus = GameStatus.VICTORY
-                    self._state.message = "恭喜胜利! / Victory!\n按 R 重新开始 / Press R to restart"
+                    self._state.message = MESSAGE_VICTORY
 
                 return True
 
@@ -544,7 +544,7 @@ class GameController(QObject):
             # 检测掉落 / Check if Ball Fell
             if self._ball.isOutOfBounds():
                 self._state.gameStatus = GameStatus.GAME_OVER
-                self._state.message = "游戏结束! / Game Over!\n按 R 重新开始 / Press R to restart"
+                self._state.message = MESSAGE_GAME_OVER
 
         self._particle_model.update_particles(FIXED_DELTA_TIME)
 

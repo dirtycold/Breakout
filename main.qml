@@ -165,7 +165,7 @@ Window {
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.margins: 20
-            text: gameController && gameController.state ? "分数 Score: " + gameController.state.score : "分数 Score: 0"
+            text: gameController && gameController.state ? config.scoreLabel + ": " + gameController.state.score : config.scoreLabel + ": 0"
             font.family: "Noto Sans CJK SC"
             font.pixelSize: 24
             color: "white"
@@ -178,6 +178,7 @@ Window {
             font.pixelSize: 32
             color: "white"
             horizontalAlignment: Text.AlignHCenter
+            lineHeight: 1.25
             visible: gameController && gameController.state && gameController.state.gameStatus !== gameStatus.PLAYING
         }
     }  // 主 Item 结束

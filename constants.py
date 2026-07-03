@@ -20,6 +20,25 @@ SCREEN_HEIGHT = 600
 SCREEN_TITLE = "DX-Ball Clone - 打砖块游戏"
 SCREEN_TITLE_QML = "DX-Ball Clone (QML版) - 打砖块游戏"
 
+# 文案设置 / Text Settings
+SCORE_LABEL = "分数 Score"
+MESSAGE_START_LINES = (
+    "按空格键开始游戏",
+    "Press SPACE to Start",
+    "← → 移动挡板 / Move Paddle",
+)
+MESSAGE_GAME_OVER_LINES = (
+    "游戏结束！按 R 重新开始",
+    "Game Over! Press R to Restart",
+)
+MESSAGE_VICTORY_LINES = (
+    "恭喜胜利！按 R 重新开始",
+    "Victory! Press R to Restart",
+)
+MESSAGE_START = "\n".join(MESSAGE_START_LINES)
+MESSAGE_GAME_OVER = "\n".join(MESSAGE_GAME_OVER_LINES)
+MESSAGE_VICTORY = "\n".join(MESSAGE_VICTORY_LINES)
+
 # 计时设置 / Timing Settings
 FRAME_INTERVAL_MS = 16
 FIXED_DELTA_TIME = FRAME_INTERVAL_MS / 1000
