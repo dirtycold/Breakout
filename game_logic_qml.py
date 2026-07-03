@@ -7,11 +7,22 @@ Game Logic Layer (Python Backend)
 """
 import math
 import colorsys
+import random
 
 # 优先使用 PyQt6
 # os.environ.setdefault('QT_API', 'pyqt6')
 
-from qtpy.QtCore import QObject, Signal, Slot, Property, QTimer
+from qtpy.QtCore import (
+    QAbstractListModel,
+    QByteArray,
+    QModelIndex,
+    QObject,
+    Property,
+    QTimer,
+    Qt,
+    Signal,
+    Slot,
+)
 
 from constants import *
 
@@ -19,6 +30,204 @@ from constants import *
 def getBrickColors():
     """获取砖块颜色列表（HEX 格式）/ Get Brick Colors (HEX format)"""
     return BRICK_COLORS_HEX
+
+
+class BrickModel(QAbstractListModel):
+    """砖块模型 / Brick Model"""
+
+    BRICK_X_ROLE = int(Qt.ItemDataRole.UserRole) + 1
+    BRICK_Y_ROLE = BRICK_X_ROLE + 1
+    BRICK_WIDTH_ROLE = BRICK_X_ROLE + 2
+    BRICK_HEIGHT_ROLE = BRICK_X_ROLE + 3
+    BRICK_COLOR_ROLE = BRICK_X_ROLE + 4
+    DESTROYED_ROLE = BRICK_X_ROLE + 5
+
+    ROLE_NAMES = {
+        BRICK_X_ROLE: b"brickX",
+        BRICK_Y_ROLE: b"brickY",
+        BRICK_WIDTH_ROLE: b"brickWidth",
+        BRICK_HEIGHT_ROLE: b"brickHeight",
+        BRICK_COLOR_ROLE: b"brickColor",
+        DESTROYED_ROLE: b"destroyed",
+    }
+
+    ROLE_KEYS = {
+        BRICK_X_ROLE: "x",
+        BRICK_Y_ROLE: "y",
+        BRICK_WIDTH_ROLE: "width",
+        BRICK_HEIGHT_ROLE: "height",
+        BRICK_COLOR_ROLE: "color",
+        DESTROYED_ROLE: "destroyed",
+    }
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._bricks = []
+        self.reset_bricks()
+
+    def rowCount(self, parent=QModelIndex()):
+        if parent.isValid():
+            return 0
+        return len(self._bricks)
+
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if not index.isValid() or not 0 <= index.row() < len(self._bricks):
+            return None
+
+        key = self.ROLE_KEYS.get(int(role))
+        if key is None:
+            return None
+
+        return self._bricks[index.row()][key]
+
+    def roleNames(self):
+        return {
+            role: QByteArray(name)
+            for role, name in self.ROLE_NAMES.items()
+        }
+
+    def reset_bricks(self):
+        """重置砖块布局 / Reset brick layout."""
+        self.beginResetModel()
+        self._bricks = []
+
+        for row in range(BRICK_ROWS):
+            for column in range(bricks_in_row(row)):
+                self._bricks.append({
+                    "x": qml_brick_x(row, column),
+                    "y": qml_brick_y(row),
+                    "width": BRICK_WIDTH,
+                    "height": BRICK_HEIGHT,
+                    "color": BRICK_COLORS_HEX[row % len(BRICK_COLORS_HEX)],
+                    "destroyed": False,
+                })
+
+        self.endResetModel()
+
+    def brick_at(self, row):
+        return self._bricks[row]
+
+    def destroy_brick(self, row):
+        if not 0 <= row < len(self._bricks):
+            return
+
+        self._bricks[row]["destroyed"] = True
+        model_index = self.index(row, 0)
+        self.dataChanged.emit(model_index, model_index, [self.DESTROYED_ROLE])
+
+    def active_brick_rows(self):
+        for row, brick in enumerate(self._bricks):
+            if not brick["destroyed"]:
+                yield row, brick
+
+
+class ParticleModel(QAbstractListModel):
+    """粒子模型 / Particle Model"""
+
+    PARTICLE_X_ROLE = int(Qt.ItemDataRole.UserRole) + 1
+    PARTICLE_Y_ROLE = PARTICLE_X_ROLE + 1
+    PARTICLE_COLOR_ROLE = PARTICLE_X_ROLE + 2
+    PARTICLE_OPACITY_ROLE = PARTICLE_X_ROLE + 3
+
+    ROLE_NAMES = {
+        PARTICLE_X_ROLE: b"particleX",
+        PARTICLE_Y_ROLE: b"particleY",
+        PARTICLE_COLOR_ROLE: b"particleColor",
+        PARTICLE_OPACITY_ROLE: b"particleOpacity",
+    }
+
+    ROLE_KEYS = {
+        PARTICLE_X_ROLE: "x",
+        PARTICLE_Y_ROLE: "y",
+        PARTICLE_COLOR_ROLE: "color",
+        PARTICLE_OPACITY_ROLE: "opacity",
+    }
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._particles = []
+
+    def rowCount(self, parent=QModelIndex()):
+        if parent.isValid():
+            return 0
+        return len(self._particles)
+
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if not index.isValid() or not 0 <= index.row() < len(self._particles):
+            return None
+
+        key = self.ROLE_KEYS.get(int(role))
+        if key is None:
+            return None
+
+        return self._particles[index.row()][key]
+
+    def roleNames(self):
+        return {
+            role: QByteArray(name)
+            for role, name in self.ROLE_NAMES.items()
+        }
+
+    def clear(self):
+        if not self._particles:
+            return
+
+        self.beginResetModel()
+        self._particles = []
+        self.endResetModel()
+
+    def is_empty(self):
+        return not self._particles
+
+    def create_explosion(self, x, y, color):
+        """创建爆炸粒子 / Create explosion particles."""
+        start_row = len(self._particles)
+        end_row = start_row + PARTICLE_COUNT - 1
+        self.beginInsertRows(QModelIndex(), start_row, end_row)
+
+        for _ in range(PARTICLE_COUNT):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(PARTICLE_MIN_SPEED, PARTICLE_MAX_SPEED)
+            self._particles.append({
+                "x": x - PARTICLE_RADIUS,
+                "y": y - PARTICLE_RADIUS,
+                "vx": math.cos(angle) * speed,
+                "vy": math.sin(angle) * speed,
+                "age": 0.0,
+                "color": color,
+                "opacity": 1.0,
+            })
+
+        self.endInsertRows()
+
+    def update_particles(self, delta_time):
+        """更新粒子位置和透明度 / Update particle position and opacity."""
+        if not self._particles:
+            return
+
+        for row in range(len(self._particles) - 1, -1, -1):
+            particle = self._particles[row]
+            particle["age"] += delta_time
+
+            if particle["age"] >= PARTICLE_LIFETIME:
+                self.beginRemoveRows(QModelIndex(), row, row)
+                self._particles.pop(row)
+                self.endRemoveRows()
+                continue
+
+            particle["x"] += particle["vx"] * delta_time
+            particle["y"] += particle["vy"] * delta_time
+            particle["vy"] += PARTICLE_GRAVITY * delta_time
+            particle["opacity"] = max(0.0, 1.0 - particle["age"] / PARTICLE_LIFETIME)
+
+        if self._particles:
+            top_left = self.index(0, 0)
+            bottom_right = self.index(len(self._particles) - 1, 0)
+            self.dataChanged.emit(top_left, bottom_right, [
+                self.PARTICLE_X_ROLE,
+                self.PARTICLE_Y_ROLE,
+                self.PARTICLE_OPACITY_ROLE,
+            ])
 
 
 class GameState(QObject):
@@ -187,12 +396,15 @@ class Ball(QObject):
 class GameController(QObject):
     """游戏主控制器 / Main Game Controller"""
 
-    requestCreateExplosion = Signal(float, float, str)  # x, y, color
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self._state = GameState(self)
         self._ball = Ball(self)
+        self._brick_model = BrickModel(self)
+        self._particle_model = ParticleModel(self)
+        self._paddle_x = (SCREEN_WIDTH - PADDLE_WIDTH) / 2
+        self._paddle_y = qml_paddle_y()
+        self._paddle_width = PADDLE_WIDTH
 
         self._state.brickCount = total_brick_count()
 
@@ -211,6 +423,16 @@ class GameController(QObject):
         """球对象"""
         return self._ball
 
+    @Property(QObject, constant=True)
+    def brickModel(self):
+        """砖块模型"""
+        return self._brick_model
+
+    @Property(QObject, constant=True)
+    def particleModel(self):
+        """粒子模型"""
+        return self._particle_model
+
     @Slot()
     def startGame(self):
         """开始游戏 / Start Game"""
@@ -225,6 +447,8 @@ class GameController(QObject):
         """重置游戏 / Reset Game"""
         self.timer.stop()
         self._ball.reset()
+        self._brick_model.reset_bricks()
+        self._particle_model.clear()
         self._state.score = 0
         self._state.gameStatus = GameStatus.NOT_STARTED
         self._state.message = "按空格键开始 / Press SPACE to start"
@@ -232,80 +456,97 @@ class GameController(QObject):
         # 重置砖块计数
         self._state.brickCount = total_brick_count()
 
-    @Slot(float, float, float, result=bool)
-    def checkPaddleCollision(self, paddle_x, paddle_y, paddle_width):
-        """检测挡板碰撞 / Check Paddle Collision"""
+    @Slot(float, float, float)
+    def updatePaddle(self, paddle_x, paddle_y, paddle_width):
+        """更新挡板位置 / Update paddle position."""
+        self._paddle_x = paddle_x
+        self._paddle_y = paddle_y
+        self._paddle_width = paddle_width
+
+        if self._state.gameStatus == GameStatus.NOT_STARTED:
+            self._ball.followPaddle(paddle_x, paddle_width)
+
+    def _check_brick_collisions(self):
+        """检测所有砖块碰撞 / Check all brick collisions."""
         if self._state.gameStatus != GameStatus.PLAYING:
             return False
-        return self._ball.checkPaddleCollision(paddle_x, paddle_y, paddle_width)
 
-    @Slot(float, float, float, float, str, result=bool)
-    def checkBrickCollision(self, brick_x, brick_y, brick_width, brick_height, brick_color):
-        """检测砖块碰撞 / Check Brick Collision"""
-        if self._state.gameStatus != GameStatus.PLAYING:
-            return False
+        for row, brick in self._brick_model.active_brick_rows():
+            if self._check_single_brick_collision(brick):
+                self._brick_model.destroy_brick(row)
+                self._state.score += SCORE_PER_BRICK
+                self._state.brickCount -= 1
 
+                self._particle_model.create_explosion(
+                    brick["x"] + brick["width"] / 2,
+                    brick["y"] + brick["height"] / 2,
+                    brick["color"]
+                )
+
+                if self._state.brickCount <= 0:
+                    self._state.gameStatus = GameStatus.VICTORY
+                    self._state.message = "恭喜胜利! / Victory!\n按 R 重新开始 / Press R to restart"
+
+                return True
+
+        return False
+
+    def _check_single_brick_collision(self, brick):
+        """检测单个砖块并处理反弹 / Check one brick and bounce the ball."""
         ball_x = self._ball.x
         ball_y = self._ball.y
+        brick_x = brick["x"]
+        brick_y = brick["y"]
+        brick_width = brick["width"]
+        brick_height = brick["height"]
 
-        # AABB 碰撞检测
         closest_x = max(brick_x, min(ball_x, brick_x + brick_width))
         closest_y = max(brick_y, min(ball_y, brick_y + brick_height))
-
         distance = math.sqrt((ball_x - closest_x)**2 + (ball_y - closest_y)**2)
 
-        if distance < BALL_RADIUS:
-            # 计算碰撞方向 / Calculate Collision Direction
-            brick_center_x = brick_x + brick_width / 2
-            brick_center_y = brick_y + brick_height / 2
-            dx = ball_x - brick_center_x
-            dy = ball_y - brick_center_y
-            overlap_x = brick_width / 2 + BALL_RADIUS - abs(dx)
-            overlap_y = brick_height / 2 + BALL_RADIUS - abs(dy)
+        if distance >= BALL_RADIUS:
+            return False
 
-            if overlap_x < overlap_y:
-                self._ball._dx = -self._ball._dx
-                if dx > 0:
-                    self._ball._x = brick_center_x + brick_width / 2 + BALL_RADIUS
-                else:
-                    self._ball._x = brick_center_x - brick_width / 2 - BALL_RADIUS
+        brick_center_x = brick_x + brick_width / 2
+        brick_center_y = brick_y + brick_height / 2
+        dx = ball_x - brick_center_x
+        dy = ball_y - brick_center_y
+        overlap_x = brick_width / 2 + BALL_RADIUS - abs(dx)
+        overlap_y = brick_height / 2 + BALL_RADIUS - abs(dy)
+
+        if overlap_x < overlap_y:
+            self._ball._dx = -self._ball._dx
+            if dx > 0:
+                self._ball._x = brick_center_x + brick_width / 2 + BALL_RADIUS
             else:
-                self._ball._dy = -self._ball._dy
-                if dy > 0:
-                    self._ball._y = brick_center_y + brick_height / 2 + BALL_RADIUS
-                else:
-                    self._ball._y = brick_center_y - brick_height / 2 - BALL_RADIUS
+                self._ball._x = brick_center_x - brick_width / 2 - BALL_RADIUS
+        else:
+            self._ball._dy = -self._ball._dy
+            if dy > 0:
+                self._ball._y = brick_center_y + brick_height / 2 + BALL_RADIUS
+            else:
+                self._ball._y = brick_center_y - brick_height / 2 - BALL_RADIUS
 
-            self._ball.positionChanged.emit(self._ball.x, self._ball.y)
-
-            # 增加分数 / Increase Score
-            self._state.score += SCORE_PER_BRICK
-            
-            # 减少砖块计数 / Decrease brick count
-            self._state.brickCount -= 1
-            
-            # 检测胜利 / Check Victory
-            if self._state.brickCount <= 0:
-                self.timer.stop()
-                self._state.gameStatus = GameStatus.VICTORY
-                self._state.message = "恭喜胜利! / Victory!\n按 R 重新开始 / Press R to restart"
-
-            # 创建爆炸效果 / Create Explosion Effect
-            self.requestCreateExplosion.emit(
-                brick_x + brick_width / 2,
-                brick_y + brick_height / 2,
-                brick_color
-            )
-
-            return True
-        return False
+        self._ball.positionChanged.emit(self._ball.x, self._ball.y)
+        return True
 
     def _update(self):
         """游戏主循环 / Main Game Loop"""
-        self._ball.update(FIXED_DELTA_TIME)  # 约 60 FPS
+        if self._state.gameStatus == GameStatus.PLAYING:
+            self._ball.update(FIXED_DELTA_TIME)  # 约 60 FPS
+            self._ball.checkPaddleCollision(
+                self._paddle_x,
+                self._paddle_y,
+                self._paddle_width
+            )
+            self._check_brick_collisions()
 
-        # 检测掉落 / Check if Ball Fell
-        if self._ball.isOutOfBounds():
+            # 检测掉落 / Check if Ball Fell
+            if self._ball.isOutOfBounds():
+                self._state.gameStatus = GameStatus.GAME_OVER
+                self._state.message = "游戏结束! / Game Over!\n按 R 重新开始 / Press R to restart"
+
+        self._particle_model.update_particles(FIXED_DELTA_TIME)
+
+        if self._state.gameStatus != GameStatus.PLAYING and self._particle_model.is_empty():
             self.timer.stop()
-            self._state.gameStatus = GameStatus.GAME_OVER
-            self._state.message = "游戏结束! / Game Over!\n按 R 重新开始 / Press R to restart"
