@@ -87,6 +87,34 @@ class GameConfigProvider(QObject):
         return SCORE_LABEL
 
     @Property(int, constant=True)
+    def scoreFontSize(self):
+        return SCORE_FONT_SIZE
+
+    @Property(int, constant=True)
+    def scoreMarginX(self):
+        return SCORE_MARGIN_X
+
+    @Property(int, constant=True)
+    def scoreMarginTop(self):
+        return SCORE_MARGIN_TOP
+
+    @Property(int, constant=True)
+    def messagePrimaryFontSize(self):
+        return MESSAGE_PRIMARY_FONT_SIZE
+
+    @Property(int, constant=True)
+    def messageSecondaryFontSize(self):
+        return MESSAGE_SECONDARY_FONT_SIZE
+
+    @Property(int, constant=True)
+    def messageHintFontSize(self):
+        return MESSAGE_HINT_FONT_SIZE
+
+    @Property(int, constant=True)
+    def messageLineSpacing(self):
+        return MESSAGE_LINE_SPACING
+
+    @Property(int, constant=True)
     def frameIntervalMs(self):
         return FRAME_INTERVAL_MS
 

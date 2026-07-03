@@ -164,22 +164,50 @@ Window {
         Text {
             anchors.top: parent.top
             anchors.left: parent.left
-            anchors.margins: 20
+            anchors.leftMargin: config.scoreMarginX
+            anchors.topMargin: config.scoreMarginTop
             text: gameController && gameController.state ? config.scoreLabel + ": " + gameController.state.score : config.scoreLabel + ": 0"
-            font.family: "Noto Sans CJK SC"
-            font.pixelSize: 24
+            font.pixelSize: config.scoreFontSize
             color: "white"
         }
 
-        Text {
+        Column {
+            id: messageOverlay
             anchors.centerIn: parent
-            text: gameController && gameController.state ? gameController.state.message : ""
-            font.family: "Noto Sans CJK SC"
-            font.pixelSize: 32
-            color: "white"
-            horizontalAlignment: Text.AlignHCenter
-            lineHeight: 1.25
+            spacing: config.messageLineSpacing
             visible: gameController && gameController.state && gameController.state.gameStatus !== gameStatus.PLAYING
+
+            property var messageLines: gameController && gameController.state ? gameController.state.message.split("\n") : []
+
+            function messageLine(lineIndex) {
+                return lineIndex < messageLines.length ? messageLines[lineIndex] : ""
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: messageOverlay.messageLine(0)
+                font.pixelSize: config.messagePrimaryFontSize
+                color: "white"
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: messageOverlay.messageLine(1)
+                font.pixelSize: config.messageSecondaryFontSize
+                color: "white"
+                horizontalAlignment: Text.AlignHCenter
+                visible: text.length > 0
+            }
+
+            Text {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: messageOverlay.messageLine(2)
+                font.pixelSize: config.messageHintFontSize
+                color: "white"
+                horizontalAlignment: Text.AlignHCenter
+                visible: text.length > 0
+            }
         }
     }  // 主 Item 结束
 }

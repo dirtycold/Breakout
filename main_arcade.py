@@ -242,8 +242,7 @@ class BreakoutGame(arcade.Window):
             f"{SCORE_LABEL}: {self.score}",
             10, SCREEN_HEIGHT - 30,
             arcade.color.WHITE,
-            20,
-            font_name="Noto Sans CJK SC"
+            SCORE_FONT_SIZE
         )
 
         # 如果游戏未开始，显示开始提示 / Show start message if game hasn't started
@@ -252,25 +251,22 @@ class BreakoutGame(arcade.Window):
                 MESSAGE_START_LINES[0],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
                 arcade.color.WHITE,
-                30,
-                anchor_x="center",
-                font_name="Noto Sans CJK SC"
+                MESSAGE_PRIMARY_FONT_SIZE,
+                anchor_x="center"
             )
             arcade.draw_text(
                 MESSAGE_START_LINES[1],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40,
                 arcade.color.WHITE,
-                20,
-                anchor_x="center",
-                font_name="Noto Sans CJK SC"
+                MESSAGE_SECONDARY_FONT_SIZE,
+                anchor_x="center"
             )
             arcade.draw_text(
                 MESSAGE_START_LINES[2],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 80,
                 arcade.color.WHITE,
-                16,
-                anchor_x="center",
-                font_name="Noto Sans CJK SC"
+                MESSAGE_HINT_FONT_SIZE,
+                anchor_x="center"
             )
 
         # 如果游戏结束，显示提示 / Show game over message
@@ -279,17 +275,15 @@ class BreakoutGame(arcade.Window):
                 MESSAGE_GAME_OVER_LINES[0],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
                 arcade.color.WHITE,
-                30,
-                anchor_x="center",
-                font_name="Noto Sans CJK SC"
+                MESSAGE_PRIMARY_FONT_SIZE,
+                anchor_x="center"
             )
             arcade.draw_text(
                 MESSAGE_GAME_OVER_LINES[1],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40,
                 arcade.color.WHITE,
-                20,
-                anchor_x="center",
-                font_name="Noto Sans CJK SC"
+                MESSAGE_SECONDARY_FONT_SIZE,
+                anchor_x="center"
             )
 
         # 如果胜利，显示提示 / Show victory message
@@ -298,17 +292,15 @@ class BreakoutGame(arcade.Window):
                 MESSAGE_VICTORY_LINES[0],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
                 arcade.color.WHITE,
-                30,
-                anchor_x="center",
-                font_name="Noto Sans CJK SC"
+                MESSAGE_PRIMARY_FONT_SIZE,
+                anchor_x="center"
             )
             arcade.draw_text(
                 MESSAGE_VICTORY_LINES[1],
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40,
                 arcade.color.WHITE,
-                20,
-                anchor_x="center",
-                font_name="Noto Sans CJK SC"
+                MESSAGE_SECONDARY_FONT_SIZE,
+                anchor_x="center"
             )
 
     def on_update(self, delta_time):
