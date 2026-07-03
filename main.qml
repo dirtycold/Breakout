@@ -115,27 +115,23 @@ Window {
             }
         }
 
-        // 球（彩虹渐变）
-        Rectangle {
+        // 球（彩虹条纹）
+        Item {
             id: ball
             width: config.ballDiameter
             height: config.ballDiameter
-            radius: config.ballRadius
             x: gameController && gameController.ball ? gameController.ball.x - config.ballRadius : paddle.x + paddle.width / 2 - config.ballRadius
             y: gameController && gameController.ball ? gameController.ball.y - config.ballRadius : config.ballStartCenterY - config.ballRadius
-            color: config.ballColor
 
-            Connections {
-                target: gameController ? gameController.ball : null
-                function onColorChanged(newColor) {
-                    ball.color = newColor
-                }
+            Image {
+                anchors.fill: parent
+                source: gameController && gameController.ball ? gameController.ball.textureSource : ""
+                rotation: gameController && gameController.ball ? gameController.ball.rotation : 0
+                transformOrigin: Item.Center
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                mipmap: true
             }
-
-            // 抗锯齿效果
-            layer.enabled: true
-            layer.smooth: true
-            antialiasing: true
         }
 
         // 粒子系统

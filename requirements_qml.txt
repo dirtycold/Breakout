@@ -1,2 +1,3 @@
 qtpy
 PyQt6
+pillow

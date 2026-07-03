@@ -79,10 +79,6 @@ class GameConfigProvider(QObject):
         return COLOR_PADDLE_HEX
 
     @Property(str, constant=True)
-    def ballColor(self):
-        return "#%02x%02x%02x" % COLOR_BALL
-
-    @Property(str, constant=True)
     def scoreLabel(self):
         return SCORE_LABEL
 

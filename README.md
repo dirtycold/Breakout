@@ -28,8 +28,9 @@ pip install -r requirements_qml.txt
 
 或手动安装：
 ```bash
-pip install qtpy PyQt6
+pip install qtpy PyQt6 pillow
 ```
+> QML 版本也会通过 Pillow 生成共享彩虹球纹理；使用 `requirements_qml.txt` 安装会自动包含它。
 
 ## 运行游戏 / Run the Game
 
@@ -57,7 +58,7 @@ python main_qml.py
 - 🎮 球、挡板、砖块基础玩法
 - 💎 菱形砖块布局（视觉更美观）
 - 🎯 改进的物理碰撞系统（精确的左右、上下反弹）
-- 🌈 彩虹渐变球（HSV色彩空间动画效果）
+- 🌈 彩虹条纹球（共享纹理 + 连续变向旋转动画）
 - ✨ 抗锯齿圆形球体（使用PIL超采样技术）
 - 💥 砖块爆炸粒子效果（重力、淡出动画）
 - 🎲 智能球反弹（击中挡板不同位置产生不同角度）
@@ -83,6 +84,7 @@ Breakout/
 ├── game_logic_qml.py    # QML 游戏逻辑层（Python）
 ├── main.qml             # QML UI 界面
 ├── constants.py         # 共享常量配置
+├── ball_texture.py      # 共享彩虹球纹理与旋转动画
 ├── qt_config.py         # Qt 绑定配置（qtpy）
 ├── requirements.txt     # Arcade 依赖
 ├── requirements_qml.txt # QML 依赖
@@ -96,9 +98,9 @@ Breakout/
 
 ### 主要类 / Main Classes
 
-- **`RainbowBall`**: 彩虹渐变球类
-  - 使用 PIL 创建抗锯齿圆形纹理
-  - HSV 色彩空间实现彩虹渐变动画
+- **`RainbowBall`**: 彩虹条纹球类
+  - 使用 PIL 创建抗锯齿彩虹条纹纹理
+  - 使用平滑插值的随机目标角速度实现连续变向旋转
   - 继承自 `arcade.Sprite`
 
 - **`BreakoutGame`**: 主游戏窗口类
@@ -117,8 +119,8 @@ Breakout/
 
 ### 技术亮点 / Technical Highlights
 
-1. **抗锯齿渲染**: 使用 PIL 的 4x 超采样技术渲染平滑圆形
-2. **色彩动画**: HSV 色彩空间转 RGB，实现流畅彩虹效果
+1. **抗锯齿渲染**: 使用 PIL 的 4x 超采样技术渲染平滑圆形和条纹边缘
+2. **纹理动画**: 共享彩虹条纹纹理，使用连续变向旋转实现动画效果
 3. **物理碰撞**: 基于重叠量判断碰撞方向，避免球体卡住
 4. **粒子系统**: 自定义粒子效果（速度、重力、淡出）
 5. **角度控制**: 击中挡板不同位置产生 ±60° 反弹角度
@@ -134,7 +136,8 @@ Breakout/
    - 精确碰撞方向判断（重叠量计算）
 4. **向量运算**: 使用三角函数（`math.sin`, `math.cos`）计算球的速度分量
 5. **视觉效果**:
-   - HSV/RGB 色彩空间转换（`colorsys.hsv_to_rgb`）
+   - 程序化彩虹条纹纹理
+   - 平滑旋转速度插值
    - 粒子系统（位置、速度、透明度动画）
    - 抗锯齿渲染（PIL 超采样）
 6. **图像处理**: 使用 PIL (Pillow) 创建纹理
@@ -157,7 +160,8 @@ Breakout/
 ### 视觉效果
 - `BRICK_COLORS`: 砖块颜色列表（RGB 元组）
 - `COLOR_BACKGROUND`: 背景颜色
-- `RAINBOW_SPEED`: 彩虹渐变速度
+- `BALL_ROTATION_MIN_SPEED` / `BALL_ROTATION_MAX_SPEED`: 彩虹球旋转速度范围
+- `BALL_ROTATION_SMOOTHING`: 旋转方向变化的平滑程度
 - `PARTICLE_COUNT`: 爆炸粒子数量
 - `PARTICLE_LIFETIME`: 粒子存活时间（秒）
 
@@ -174,7 +178,6 @@ Breakout/
 - **依赖库**:
   - `arcade`: 游戏框架
   - `pillow`: 图像处理（用于创建抗锯齿纹理）
-  - `colorsys`: 色彩空间转换（Python 标准库）
 
 ## 许可证 / License
 

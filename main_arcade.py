@@ -9,54 +9,37 @@ Simple brick-breaker game for kids to learn
 import arcade
 import math
 import random
-import colorsys
 from PIL import Image, ImageDraw
+from ball_texture import RainbowBallMotion, create_rainbow_ball_image
 from constants import *
 
 
 class RainbowBall(arcade.Sprite):
-    """彩虹渐变球类 / Rainbow Gradient Ball Class"""
+    """彩虹条纹球类 / Rainbow Striped Ball Class"""
 
     def __init__(self, radius):
         super().__init__()
         self.radius = radius
-        self.rainbow_phase = 0
+        self.motion = RainbowBallMotion()
 
         # 创建抗锯齿的圆形纹理
-        self._create_circle_texture()
+        self._create_rainbow_texture()
 
-    def _create_circle_texture(self):
-        """创建带抗锯齿的圆形纹理 / Create antialiased circle texture"""
-        # 创建一个更大的图像用于超采样抗锯齿
-        size = int(self.radius * 2 * 4)  # 4x超采样
-
-        # 创建PIL图像
-        image = Image.new('RGBA', (size, size), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(image)
-
-        # 绘制抗锯齿圆形
-        draw.ellipse([0, 0, size - 1, size - 1], fill=(255, 255, 255, 255))
-
-        # 缩小到实际尺寸（提供抗锯齿效果）
-        image = image.resize((int(self.radius * 2), int(self.radius * 2)), Image.Resampling.LANCZOS)
-
-        # 转换为Arcade纹理 - 使用正确的方法
-        self.texture = arcade.Texture(image=image, name=f"rainbow_ball_{id(self)}")
+    def _create_rainbow_texture(self):
+        """创建彩虹条纹纹理 / Create rainbow stripe texture."""
+        self.texture = arcade.Texture(
+            image=create_rainbow_ball_image(self.radius),
+            name=f"rainbow_ball_{id(self)}"
+        )
 
         # 设置碰撞框
         self.width = self.radius * 2
         self.height = self.radius * 2
+        self.angle = self.motion.rotation
 
     def update_animation(self, delta_time=FIXED_DELTA_TIME):
-        """更新彩虹颜色 / Update rainbow color"""
-        self.rainbow_phase = (self.rainbow_phase + RAINBOW_SPEED * delta_time) % 1.0
-
-        # 使用HSV色彩空间创建彩虹效果
-        # Using HSV color space to create rainbow effect
-        rgb = colorsys.hsv_to_rgb(self.rainbow_phase, 1.0, 1.0)
-
-        # 转换为0-255范围的整数
-        self.color = (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))
+        """更新彩虹纹理旋转 / Update rainbow texture rotation."""
+        self.angle = self.motion.update(delta_time)
 
 
 class RoundedRectBrick(arcade.Sprite):
@@ -307,7 +290,8 @@ class BreakoutGame(arcade.Window):
         """更新游戏逻辑 / Update game logic"""
 
         if self.game_status in (GameStatus.GAME_OVER, GameStatus.VICTORY):
-            # 只更新粒子效果 / Only update particle effects
+            # 只更新动画和粒子效果 / Only update animation and particle effects
+            self.ball.update_animation(delta_time)
             self.update_particles(delta_time)
             return
 
@@ -327,6 +311,7 @@ class BreakoutGame(arcade.Window):
 
             # 球跟随挡板移动 / Ball follows paddle
             self.ball.center_x = self.paddle.center_x
+            self.ball.update_animation(delta_time)
             return
 
         # 更新挡板位置 / Update paddle position

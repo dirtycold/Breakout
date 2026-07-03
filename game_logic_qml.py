@@ -6,7 +6,6 @@ Game Logic Layer (Python Backend)
 使用 qtpy 抽象层，优先选择 PyQt6
 """
 import math
-import colorsys
 import random
 
 # 优先使用 PyQt6
@@ -24,6 +23,7 @@ from qtpy.QtCore import (
     Slot,
 )
 
+from ball_texture import RainbowBallMotion, create_rainbow_ball_data_url
 from constants import *
 
 # 导出颜色列表供 QML 使用
@@ -290,7 +290,7 @@ class Ball(QObject):
     """球对象 / Ball Object"""
 
     positionChanged = Signal(float, float)
-    colorChanged = Signal(str)
+    rotationChanged = Signal(float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -299,7 +299,9 @@ class Ball(QObject):
         self._dx = 0
         self._dy = 0
         self._active = False
-        self._hue = 0.0
+        self._motion = RainbowBallMotion()
+        self._rotation = self._motion.rotation
+        self._texture_source = create_rainbow_ball_data_url(BALL_RADIUS)
 
     @Property(float, notify=positionChanged)
     def x(self):
@@ -308,6 +310,14 @@ class Ball(QObject):
     @Property(float, notify=positionChanged)
     def y(self):
         return self._y
+
+    @Property(float, notify=rotationChanged)
+    def rotation(self):
+        return self._rotation
+
+    @Property(str, constant=True)
+    def textureSource(self):
+        return self._texture_source
 
     @Slot()
     def launch(self):
@@ -336,13 +346,12 @@ class Ball(QObject):
             self._dy = -self._dy
             self._y = BALL_RADIUS
 
-        # 更新彩虹色 / Update Rainbow Color
-        self._hue = (self._hue + RAINBOW_SPEED * delta_time) % 1.0
-        rgb = colorsys.hsv_to_rgb(self._hue, 1.0, 1.0)
-        color = f"#{int(rgb[0]*255):02x}{int(rgb[1]*255):02x}{int(rgb[2]*255):02x}"
-        self.colorChanged.emit(color)
-
         self.positionChanged.emit(self._x, self._y)
+
+    def update_rotation(self, delta_time):
+        """更新彩虹纹理旋转 / Update rainbow texture rotation."""
+        self._rotation = self._motion.update(delta_time)
+        self.rotationChanged.emit(self._rotation)
 
     @Slot(float, float, float, result=bool)
     def checkPaddleCollision(self, paddle_x, paddle_y, paddle_width):
@@ -382,7 +391,10 @@ class Ball(QObject):
         self._dx = 0
         self._dy = 0
         self._active = False
+        self._motion.reset()
+        self._rotation = self._motion.rotation
         self.positionChanged.emit(self._x, self._y)
+        self.rotationChanged.emit(self._rotation)
 
     @Slot(float, float)
     def followPaddle(self, paddle_x, paddle_width):
@@ -412,6 +424,7 @@ class GameController(QObject):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._update)
         self.timer.setInterval(FRAME_INTERVAL_MS)  # ~60 FPS
+        self.timer.start()
 
     @Property(QObject, constant=True)
     def state(self):
@@ -438,14 +451,14 @@ class GameController(QObject):
         """开始游戏 / Start Game"""
         if self._state.gameStatus == GameStatus.NOT_STARTED:
             self._ball.launch()
-            self.timer.start()
+            if not self.timer.isActive():
+                self.timer.start()
             self._state.message = ""
             self._state.gameStatus = GameStatus.PLAYING
 
     @Slot()
     def resetGame(self):
         """重置游戏 / Reset Game"""
-        self.timer.stop()
         self._ball.reset()
         self._brick_model.reset_bricks()
         self._particle_model.clear()
@@ -532,6 +545,8 @@ class GameController(QObject):
 
     def _update(self):
         """游戏主循环 / Main Game Loop"""
+        self._ball.update_rotation(FIXED_DELTA_TIME)
+
         if self._state.gameStatus == GameStatus.PLAYING:
             self._ball.update(FIXED_DELTA_TIME)  # 约 60 FPS
             self._ball.checkPaddleCollision(
@@ -547,6 +562,3 @@ class GameController(QObject):
                 self._state.message = MESSAGE_GAME_OVER
 
         self._particle_model.update_particles(FIXED_DELTA_TIME)
-
-        if self._state.gameStatus != GameStatus.PLAYING and self._particle_model.is_empty():
-            self.timer.stop()
