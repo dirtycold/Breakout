@@ -75,6 +75,40 @@ BRICK_COLORS_HEX = [
 ]
 COLOR_BACKGROUND_HEX = "#1A1A2E"
 COLOR_PADDLE_HEX = "#3498DB"
+COLOR_PADDLE_FANG = (248, 250, 252)  # #F8FAFC
+COLOR_PADDLE_FANG_SHADOW = (148, 163, 184)  # #94A3B8
+COLOR_PADDLE_FANG_HEX = "#F8FAFC"
+COLOR_PADDLE_FANG_SHADOW_HEX = "#94A3B8"
+PADDLE_GRADIENT_COLORS = [
+    (239, 68, 68),    # red
+    (249, 115, 22),   # orange
+    (250, 204, 21),   # yellow
+    (34, 197, 94),    # green
+    (59, 130, 246),   # blue
+    (147, 51, 234),   # purple
+    (217, 70, 239),   # fuchsia transition
+    (239, 68, 68),    # red loop
+]
+PADDLE_GRADIENT_COLORS_HEX = [
+    "#EF4444",
+    "#F97316",
+    "#FACC15",
+    "#22C55E",
+    "#3B82F6",
+    "#9333EA",
+    "#D946EF",
+    "#EF4444",
+]
+PADDLE_GRADIENT_STOPS = [
+    0.0,
+    0.16,
+    0.32,
+    0.48,
+    0.64,
+    0.80,
+    0.90,
+    1.0,
+]
 
 # 挡板设置 / Paddle Settings
 PADDLE_WIDTH = 100
@@ -83,6 +117,10 @@ PADDLE_SPEED = 500  # 像素/秒 pixels/second
 PADDLE_Y_POSITION = 50  # 挡板中心距离底部的高度
 PADDLE_CORNER_RADIUS = 10
 PADDLE_BOUNCE_MAX_ANGLE = 60
+PADDLE_FANG_COUNT = 12
+PADDLE_FANG_HEIGHT = 9
+PADDLE_FANG_SIDE_INSET = 7
+PADDLE_GRADIENT_SCROLL_SPEED = 80  # 像素/秒 pixels/second
 
 # 球设置 / Ball Settings
 BALL_RADIUS = 10

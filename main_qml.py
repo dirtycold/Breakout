@@ -79,6 +79,22 @@ class GameConfigProvider(QObject):
         return COLOR_PADDLE_HEX
 
     @Property(str, constant=True)
+    def paddleFangColor(self):
+        return COLOR_PADDLE_FANG_HEX
+
+    @Property(str, constant=True)
+    def paddleFangShadowColor(self):
+        return COLOR_PADDLE_FANG_SHADOW_HEX
+
+    @Property(list, constant=True)
+    def paddleGradientColors(self):
+        return PADDLE_GRADIENT_COLORS_HEX
+
+    @Property(list, constant=True)
+    def paddleGradientStops(self):
+        return PADDLE_GRADIENT_STOPS
+
+    @Property(str, constant=True)
     def scoreLabel(self):
         return SCORE_LABEL
 
@@ -133,6 +149,22 @@ class GameConfigProvider(QObject):
     @Property(int, constant=True)
     def paddleCornerRadius(self):
         return PADDLE_CORNER_RADIUS
+
+    @Property(int, constant=True)
+    def paddleFangCount(self):
+        return PADDLE_FANG_COUNT
+
+    @Property(int, constant=True)
+    def paddleFangHeight(self):
+        return PADDLE_FANG_HEIGHT
+
+    @Property(int, constant=True)
+    def paddleFangSideInset(self):
+        return PADDLE_FANG_SIDE_INSET
+
+    @Property(float, constant=True)
+    def paddleGradientScrollSpeed(self):
+        return PADDLE_GRADIENT_SCROLL_SPEED
 
     @Property(float, constant=True)
     def paddleMoveStep(self):

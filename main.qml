@@ -89,13 +89,110 @@ Window {
             id: paddle
             width: config.paddleWidth
             height: config.paddleHeight
-            color: config.paddleColor
+            color: "transparent"
             radius: config.paddleCornerRadius
             x: (root.width - width) / 2
             y: config.paddleY
 
             property bool moveLeft: false
             property bool moveRight: false
+            property real gradientOffset: 0
+
+            Canvas {
+                id: paddleGradient
+                anchors.fill: parent
+                z: 0
+
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
+
+                    if (width <= 0 || height <= 0) {
+                        return
+                    }
+
+                    ctx.save()
+                    roundedRectPath(ctx, 0, 0, width, height, config.paddleCornerRadius)
+                    ctx.clip()
+
+                    var offset = paddle.gradientOffset % width
+                    for (var startX = offset - width; startX < width; startX += width) {
+                        drawGradientSpan(ctx, startX)
+                    }
+
+                    ctx.restore()
+                }
+
+                function roundedRectPath(ctx, x, y, w, h, r) {
+                    var radius = Math.min(r, w / 2, h / 2)
+                    ctx.beginPath()
+                    ctx.moveTo(x + radius, y)
+                    ctx.lineTo(x + w - radius, y)
+                    ctx.quadraticCurveTo(x + w, y, x + w, y + radius)
+                    ctx.lineTo(x + w, y + h - radius)
+                    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h)
+                    ctx.lineTo(x + radius, y + h)
+                    ctx.quadraticCurveTo(x, y + h, x, y + h - radius)
+                    ctx.lineTo(x, y + radius)
+                    ctx.quadraticCurveTo(x, y, x + radius, y)
+                    ctx.closePath()
+                }
+
+                function drawGradientSpan(ctx, startX) {
+                    var colors = config.paddleGradientColors
+                    var stops = config.paddleGradientStops
+                    var gradient = ctx.createLinearGradient(startX, 0, startX + width, 0)
+
+                    for (var i = 0; i < colors.length; i++) {
+                        gradient.addColorStop(stops[i], colors[i])
+                    }
+
+                    ctx.fillStyle = gradient
+                    ctx.fillRect(startX, 0, width, height)
+                }
+
+                Component.onCompleted: requestPaint()
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+            }
+
+            Canvas {
+                id: paddleFangs
+                anchors.top: parent.top
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: config.paddleFangSideInset
+                anchors.rightMargin: config.paddleFangSideInset
+                height: config.paddleFangHeight
+                z: 1
+
+                onPaint: {
+                    var ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
+                    ctx.fillStyle = config.paddleFangColor
+                    ctx.strokeStyle = config.paddleFangShadowColor
+                    ctx.lineWidth = 1
+
+                    var spacing = width / config.paddleFangCount
+                    for (var i = 0; i < config.paddleFangCount; i++) {
+                        var baseLeft = i * spacing
+                        var baseRight = (i + 1) * spacing
+                        var tipX = (baseLeft + baseRight) / 2
+
+                        ctx.beginPath()
+                        ctx.moveTo(baseLeft, 0)
+                        ctx.lineTo(baseRight, 0)
+                        ctx.lineTo(tipX, height)
+                        ctx.closePath()
+                        ctx.fill()
+                        ctx.stroke()
+                    }
+                }
+
+                Component.onCompleted: requestPaint()
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+            }
 
             // 键盘移动逻辑
             Timer {
@@ -103,6 +200,9 @@ Window {
                 repeat: true
                 interval: config.frameIntervalMs
                 onTriggered: {
+                    paddle.gradientOffset = (paddle.gradientOffset + config.paddleGradientScrollSpeed * config.fixedDeltaTime) % paddle.width
+                    paddleGradient.requestPaint()
+
                     if (paddle.moveLeft) {
                         paddle.x = Math.max(0, paddle.x - config.paddleMoveStep)
                     }
