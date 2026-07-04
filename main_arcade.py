@@ -6,9 +6,74 @@ DX-Ball Clone Game - Main Program
 Simple brick-breaker game for kids to learn
 """
 
-import arcade
+import ctypes
 import math
 import random
+import sys
+import types
+
+
+def _force_missing_gstreamer_when_gi_is_incomplete():
+    """Make pyglet treat an incomplete gi namespace as unavailable."""
+    if not sys.platform.startswith("linux"):
+        return
+
+    try:
+        import gi
+    except ImportError:
+        return
+
+    if hasattr(gi, "require_version"):
+        return
+
+    missing_gi = types.ModuleType("gi")
+
+    def require_version(*_args, **_kwargs):
+        raise ImportError("PyGObject is unavailable")
+
+    missing_gi.require_version = require_version
+    sys.modules["gi"] = missing_gi
+
+
+_force_missing_gstreamer_when_gi_is_incomplete()
+
+import arcade
+
+
+def _patch_pyglet_fontconfig_memory_faces():
+    """Avoid a fontconfig crash when Pyglet queries memory-backed faces."""
+    if not sys.platform.startswith("linux"):
+        return
+
+    try:
+        import pyglet.font.fontconfig as pyglet_fontconfig
+    except Exception:
+        return
+
+    style_from_face = pyglet_fontconfig.FontConfig.style_from_face
+    if getattr(style_from_face, "_breakout_safe", False):
+        return
+
+    def safe_style_from_face(self, font_face):
+        blank = ctypes.c_int()
+        pattern = self._fontconfig.FcFreeTypeQueryFace(
+            font_face,
+            b":pyglet-memory:",
+            0,
+            ctypes.byref(blank),
+        )
+        if not pattern:
+            return "normal", False, "normal"
+
+        result = pyglet_fontconfig.FontConfigSearchResult(self._fontconfig, pattern)
+        return result.weight, result.italic, result.stretch
+
+    safe_style_from_face._breakout_safe = True
+    pyglet_fontconfig.FontConfig.style_from_face = safe_style_from_face
+
+
+_patch_pyglet_fontconfig_memory_faces()
+
 from PIL import Image, ImageDraw
 from ball_texture import RainbowBallMotion, create_rainbow_ball_image
 from constants import *
