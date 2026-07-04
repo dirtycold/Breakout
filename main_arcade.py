@@ -350,8 +350,8 @@ class BreakoutGame(arcade.Window):
 
         # 球与挡板碰撞 / Ball collision with paddle
         if arcade.check_for_collision(self.ball, self.paddle):
-            # 计算击中挡板的相对位置 / Calculate relative hit position on paddle
-            relative_hit = (self.ball.center_x - self.paddle.center_x) / (PADDLE_WIDTH / 2)
+            # 计算击中挡板的相对位置和旋转 / Calculate relative hit position and spin
+            relative_hit = (self.ball.center_x - self.paddle.center_x) / (self.paddle.width / 2)
             relative_hit = max(-1, min(1, relative_hit))  # 限制在 -1 到 1 之间
 
             # 根据击中位置调整反弹角度 / Adjust bounce angle based on hit position
@@ -361,6 +361,7 @@ class BreakoutGame(arcade.Window):
             speed = math.sqrt(self.ball.change_x**2 + self.ball.change_y**2)
             self.ball.change_x = speed * math.sin(angle_rad)
             self.ball.change_y = abs(speed * math.cos(angle_rad))  # 确保向上
+            self.ball.motion.set_spin_from_paddle_hit(relative_hit)
 
             # 确保球在挡板上方 / Ensure ball is above paddle
             self.ball.center_y = self.paddle.center_y + PADDLE_HEIGHT / 2 + BALL_RADIUS

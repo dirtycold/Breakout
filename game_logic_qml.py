@@ -364,14 +364,16 @@ class Ball(QObject):
             self._x >= paddle_x and
             self._x <= paddle_x + paddle_width):
 
-            # 计算反弹角度 / Calculate Bounce Angle
+            # 计算反弹角度和旋转 / Calculate bounce angle and spin
             hit_pos = (self._x - paddle_x) / paddle_width  # 0.0 到 1.0
-            angle = -PADDLE_BOUNCE_MAX_ANGLE + (hit_pos * PADDLE_BOUNCE_MAX_ANGLE * 2)
+            relative_hit = max(-1.0, min(1.0, hit_pos * 2 - 1))
+            angle = relative_hit * PADDLE_BOUNCE_MAX_ANGLE
             angle_rad = math.radians(angle)
 
             speed = math.sqrt(self._dx**2 + self._dy**2)
             self._dx = speed * math.sin(angle_rad)
             self._dy = -abs(speed * math.cos(angle_rad))  # 向上为负
+            self._motion.set_spin_from_paddle_hit(relative_hit)
             self._y = paddle_y - BALL_RADIUS
             self.positionChanged.emit(self._x, self._y)
 

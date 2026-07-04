@@ -78,35 +78,24 @@ def create_rainbow_ball_data_url(radius=BALL_RADIUS):
 
 
 class RainbowBallMotion:
-    """连续变向的彩虹球旋转状态 / Smoothly changing rainbow ball rotation."""
+    """由上次挡板命中位置驱动的彩虹球旋转 / Paddle-hit driven rainbow ball rotation."""
 
     def __init__(self):
         self._random = random.Random()
         self.reset()
 
     def reset(self):
-        """重置为随机初始角度和方向 / Reset to random rotation and direction."""
+        """重置为随机初始角度，等待挡板命中决定旋转 / Reset angle; paddle hit decides spin."""
         self.rotation = self._random.uniform(0, 360)
-        self.angular_velocity = self._random_target_velocity()
-        self.target_angular_velocity = self.angular_velocity
-        self.target_time_remaining = self._random_target_time()
+        self.angular_velocity = 0
 
     def update(self, delta_time):
         """更新旋转角度 / Update rotation."""
-        self.target_time_remaining -= delta_time
-        if self.target_time_remaining <= 0:
-            self.target_angular_velocity = self._random_target_velocity()
-            self.target_time_remaining = self._random_target_time()
-
-        blend = min(1.0, BALL_ROTATION_SMOOTHING * delta_time)
-        self.angular_velocity += (self.target_angular_velocity - self.angular_velocity) * blend
         self.rotation = (self.rotation + self.angular_velocity * delta_time) % 360
         return self.rotation
 
-    def _random_target_velocity(self):
-        speed = self._random.uniform(BALL_ROTATION_MIN_SPEED, BALL_ROTATION_MAX_SPEED)
-        direction = -1 if self._random.random() < 0.5 else 1
-        return speed * direction
-
-    def _random_target_time(self):
-        return self._random.uniform(BALL_ROTATION_TARGET_MIN_TIME, BALL_ROTATION_TARGET_MAX_TIME)
+    def set_spin_from_paddle_hit(self, relative_hit):
+        """根据挡板命中位置立即设置旋转 / Set spin immediately from paddle hit position."""
+        hit = max(-1.0, min(1.0, relative_hit))
+        self.angular_velocity = -hit * BALL_ROTATION_MAX_SPEED
+        return self.angular_velocity
