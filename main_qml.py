@@ -13,13 +13,32 @@ from pathlib import Path
 # 优先使用 PyQt6
 os.environ.setdefault('QT_API', 'pyqt6')
 
-from qtpy.QtGui import QGuiApplication
+from qtpy.QtGui import QFontDatabase, QGuiApplication
 from qtpy.QtQml import QQmlApplicationEngine, qmlRegisterType
 from qtpy.QtCore import QObject, Property, Slot
 
 # 导入游戏逻辑类
 from game_logic_qml import GameState, Ball, GameController, getBrickColors
 from constants import *
+
+
+def select_game_font_family():
+    """Return the first installed family from GAME_FONT_FAMILIES."""
+    available_families = {
+        family.casefold(): family for family in QFontDatabase.families()
+    }
+
+    for family in GAME_FONT_FAMILIES:
+        if family == "sans-serif":
+            continue
+
+        installed_family = available_families.get(family.casefold())
+        if installed_family:
+            return installed_family
+
+    return GAME_FONT_FAMILIES[-1]
+
+
 from paddle_texture import create_paddle_sprite_sheet_data_url
 
 
@@ -104,9 +123,13 @@ class GameConfigProvider(QObject):
             PADDLE_GRADIENT_FRAME_COUNT,
         )
 
+    @Property(list, constant=True)
+    def gameFontFamilies(self):
+        return list(GAME_FONT_FAMILIES)
+
     @Property(str, constant=True)
     def gameFontFamily(self):
-        return GAME_FONT_FAMILY
+        return select_game_font_family()
 
     @Property(str, constant=True)
     def scoreLabel(self):

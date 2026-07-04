@@ -47,7 +47,20 @@ MESSAGE_GAME_OVER = "\n".join(MESSAGE_GAME_OVER_LINES)
 MESSAGE_VICTORY = "\n".join(MESSAGE_VICTORY_LINES)
 
 # 字号设置 / Font Size Settings
-GAME_FONT_FAMILY = "sans-serif"
+GAME_FONT_FAMILIES = (
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Heiti SC",
+    "Noto Sans CJK SC",
+    "Noto Sans SC",
+    "Source Han Sans SC",
+    "WenQuanYi Micro Hei",
+    "Microsoft YaHei",
+    "Arial Unicode MS",
+    "DejaVu Sans",
+    "sans-serif",
+)
+GAME_FONT_FAMILY = GAME_FONT_FAMILIES[0]
 SCORE_FONT_SIZE = 20
 SCORE_MARGIN_X = 10
 SCORE_MARGIN_TOP = 10
