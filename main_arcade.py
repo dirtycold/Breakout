@@ -12,6 +12,7 @@ import random
 from PIL import Image, ImageDraw
 from ball_texture import RainbowBallMotion, create_rainbow_ball_image
 from constants import *
+from paddle_texture import create_paddle_image
 
 
 class RainbowBall(arcade.Sprite):
@@ -87,6 +88,8 @@ class RoundedRectBrick(arcade.Sprite):
 class RoundedRectPaddle(arcade.Sprite):
     """圆角矩形挡板类 / Rounded Rectangle Paddle Class"""
 
+    _texture_frame_cache = {}
+
     def __init__(self, width, height, color, radius=PADDLE_CORNER_RADIUS):
         super().__init__()
         self.paddle_width = width
@@ -94,94 +97,60 @@ class RoundedRectPaddle(arcade.Sprite):
         self.paddle_color = color
         self.corner_radius = radius
         self.gradient_offset = 0
+        self._frame_index = 0
 
-        # 创建圆角矩形纹理
-        self._create_rounded_rect_texture()
-
-    def _create_rounded_rect_texture(self):
-        """创建带圆角的矩形纹理 / Create rounded rectangle texture"""
-        # 使用更大的尺寸进行超采样，然后缩小以获得更好的抗锯齿效果
-        scale = 4  # 4x 超采样
-        width = int(self.paddle_width * scale)
-        height = int(self.paddle_height * scale)
-
-        # 创建 PIL 图像
-        image = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-        gradient = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-        gradient_draw = ImageDraw.Draw(gradient)
-
-        for x in range(width):
-            gradient_x = (x / scale - self.gradient_offset) % self.paddle_width
-            color = self._gradient_color(gradient_x / max(1, self.paddle_width))
-            gradient_draw.line([(x, 0), (x, height)], fill=(*color, 255))
-
-        # 使用圆角遮罩裁剪渐变 / Clip gradient to rounded rectangle
-        mask = Image.new('L', (width, height), 0)
-        mask_draw = ImageDraw.Draw(mask)
-        mask_draw.rounded_rectangle(
-            [0, 0, width - 1, height - 1],
-            radius=self.corner_radius * scale,
-            fill=255
-        )
-        image.paste(gradient, (0, 0), mask)
-        draw = ImageDraw.Draw(image)
-
-        fang_height = PADDLE_FANG_HEIGHT * scale
-        fang_inset = PADDLE_FANG_SIDE_INSET * scale
-        usable_width = width - fang_inset * 2
-        fang_spacing = usable_width / PADDLE_FANG_COUNT
-
-        for index in range(PADDLE_FANG_COUNT):
-            base_left = fang_inset + index * fang_spacing
-            base_right = fang_inset + (index + 1) * fang_spacing
-            tip_x = (base_left + base_right) / 2
-
-            draw.polygon(
-                [
-                    (base_left, 0),
-                    (base_right, 0),
-                    (tip_x, fang_height),
-                ],
-                fill=COLOR_PADDLE_FANG,
-                outline=COLOR_PADDLE_FANG_SHADOW,
-            )
-
-        # 缩小到实际尺寸（提供抗锯齿效果）
-        image = image.resize((int(self.paddle_width), int(self.paddle_height)), Image.Resampling.LANCZOS)
-
-        # 转换为 Arcade 纹理
-        self.texture = arcade.Texture(image=image, name=f"paddle_{id(self)}")
-
-        # 设置碰撞框
+        # 预渲染挡板动画帧，运行时只切换纹理 / Pre-render frames; swap textures at runtime.
+        self._texture_frames = self._get_texture_frames()
+        self.texture = self._texture_frames[self._frame_index]
         self.width = self.paddle_width
         self.height = self.paddle_height
+
+    def _get_texture_frames(self):
+        """返回缓存的挡板动画帧 / Return cached paddle animation frames."""
+        cache_key = (
+            self.paddle_width,
+            self.paddle_height,
+            self.paddle_color,
+            self.corner_radius,
+            PADDLE_FANG_COUNT,
+            PADDLE_FANG_HEIGHT,
+            PADDLE_FANG_SIDE_INSET,
+            tuple(PADDLE_GRADIENT_COLORS),
+            tuple(PADDLE_GRADIENT_STOPS),
+            PADDLE_GRADIENT_FRAME_COUNT,
+        )
+
+        if cache_key not in self._texture_frame_cache:
+            frames = []
+            for frame_index in range(PADDLE_GRADIENT_FRAME_COUNT):
+                gradient_offset = self.paddle_width * frame_index / PADDLE_GRADIENT_FRAME_COUNT
+                frames.append(
+                    arcade.Texture(
+                        image=create_paddle_image(
+                            self.paddle_width,
+                            self.paddle_height,
+                            self.corner_radius,
+                            gradient_offset,
+                        ),
+                        name=f"paddle_{int(self.paddle_width)}x{int(self.paddle_height)}_{frame_index}"
+                    )
+                )
+            self._texture_frame_cache[cache_key] = frames
+
+        return self._texture_frame_cache[cache_key]
 
     def update_animation(self, delta_time=FIXED_DELTA_TIME):
         """更新挡板彩虹渐变偏移 / Update paddle rainbow gradient offset."""
         self.gradient_offset = (
             self.gradient_offset + PADDLE_GRADIENT_SCROLL_SPEED * delta_time
         ) % self.paddle_width
-        self._create_rounded_rect_texture()
+        next_frame_index = int(
+            self.gradient_offset / self.paddle_width * len(self._texture_frames)
+        ) % len(self._texture_frames)
 
-    def _gradient_color(self, position):
-        """返回渐变位置对应颜色 / Return color for a gradient position."""
-        colors = PADDLE_GRADIENT_COLORS
-        stops = PADDLE_GRADIENT_STOPS
-        position = max(0.0, min(1.0, position))
-
-        for index in range(len(stops) - 1):
-            if position <= stops[index + 1]:
-                start_stop = stops[index]
-                end_stop = stops[index + 1]
-                blend = 0 if end_stop == start_stop else (position - start_stop) / (end_stop - start_stop)
-                start = colors[index]
-                end = colors[index + 1]
-                return tuple(
-                    int(start[channel] + (end[channel] - start[channel]) * blend)
-                    for channel in range(3)
-                )
-
-        return colors[-1]
+        if next_frame_index != self._frame_index:
+            self._frame_index = next_frame_index
+            self.texture = self._texture_frames[self._frame_index]
 
 
 class BreakoutGame(arcade.Window):

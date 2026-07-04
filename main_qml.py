@@ -20,6 +20,7 @@ from qtpy.QtCore import QObject, Property, Slot
 # 导入游戏逻辑类
 from game_logic_qml import GameState, Ball, GameController, getBrickColors
 from constants import *
+from paddle_texture import create_paddle_sprite_sheet_data_url
 
 
 class ColorProvider(QObject):
@@ -95,6 +96,15 @@ class GameConfigProvider(QObject):
         return PADDLE_GRADIENT_STOPS
 
     @Property(str, constant=True)
+    def paddleSpriteSheetSource(self):
+        return create_paddle_sprite_sheet_data_url(
+            PADDLE_WIDTH,
+            PADDLE_HEIGHT,
+            PADDLE_CORNER_RADIUS,
+            PADDLE_GRADIENT_FRAME_COUNT,
+        )
+
+    @Property(str, constant=True)
     def scoreLabel(self):
         return SCORE_LABEL
 
@@ -165,6 +175,10 @@ class GameConfigProvider(QObject):
     @Property(float, constant=True)
     def paddleGradientScrollSpeed(self):
         return PADDLE_GRADIENT_SCROLL_SPEED
+
+    @Property(int, constant=True)
+    def paddleGradientFrameCount(self):
+        return PADDLE_GRADIENT_FRAME_COUNT
 
     @Property(float, constant=True)
     def paddleMoveStep(self):

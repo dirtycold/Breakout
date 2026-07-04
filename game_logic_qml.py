@@ -410,6 +410,8 @@ class Ball(QObject):
 class GameController(QObject):
     """游戏主控制器 / Main Game Controller"""
 
+    paddleXChanged = Signal(float)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._state = GameState(self)
@@ -419,6 +421,8 @@ class GameController(QObject):
         self._paddle_x = (SCREEN_WIDTH - PADDLE_WIDTH) / 2
         self._paddle_y = qml_paddle_y()
         self._paddle_width = PADDLE_WIDTH
+        self._paddle_move_left = False
+        self._paddle_move_right = False
 
         self._state.brickCount = total_brick_count()
 
@@ -443,6 +447,11 @@ class GameController(QObject):
         """砖块模型"""
         return self._brick_model
 
+    @Property(float, notify=paddleXChanged)
+    def paddleX(self):
+        """挡板左上角 X / Paddle left x."""
+        return self._paddle_x
+
     @Property(QObject, constant=True)
     def particleModel(self):
         """粒子模型"""
@@ -461,6 +470,9 @@ class GameController(QObject):
     @Slot()
     def resetGame(self):
         """重置游戏 / Reset Game"""
+        self._set_paddle_x((SCREEN_WIDTH - self._paddle_width) / 2, force=True)
+        self._paddle_move_left = False
+        self._paddle_move_right = False
         self._ball.reset()
         self._brick_model.reset_bricks()
         self._particle_model.clear()
@@ -474,12 +486,50 @@ class GameController(QObject):
     @Slot(float, float, float)
     def updatePaddle(self, paddle_x, paddle_y, paddle_width):
         """更新挡板位置 / Update paddle position."""
-        self._paddle_x = paddle_x
         self._paddle_y = paddle_y
         self._paddle_width = paddle_width
+        self._set_paddle_x(paddle_x)
 
-        if self._state.gameStatus == GameStatus.NOT_STARTED:
-            self._ball.followPaddle(paddle_x, paddle_width)
+    @Slot(float)
+    def setPaddleX(self, paddle_x):
+        """设置挡板左上角 X / Set paddle left x."""
+        self._set_paddle_x(paddle_x)
+
+    @Slot(bool)
+    def setPaddleMovingLeft(self, moving):
+        """设置挡板是否向左移动 / Set whether paddle moves left."""
+        self._paddle_move_left = moving
+
+    @Slot(bool)
+    def setPaddleMovingRight(self, moving):
+        """设置挡板是否向右移动 / Set whether paddle moves right."""
+        self._paddle_move_right = moving
+
+    def _set_paddle_x(self, paddle_x, force=False):
+        """更新挡板位置并同步等待发射的小球 / Update paddle and waiting ball."""
+        clamped_x = max(0, min(SCREEN_WIDTH - self._paddle_width, paddle_x))
+        if force or clamped_x != self._paddle_x:
+            self._paddle_x = clamped_x
+            self.paddleXChanged.emit(self._paddle_x)
+
+            if self._state.gameStatus == GameStatus.NOT_STARTED:
+                self._ball.followPaddle(self._paddle_x, self._paddle_width)
+
+            return True
+
+        return False
+
+    def _update_paddle(self, delta_time):
+        """按当前方向状态更新挡板 / Update paddle from current direction state."""
+        next_x = self._paddle_x
+
+        if self._paddle_move_left:
+            next_x -= PADDLE_SPEED * delta_time
+        if self._paddle_move_right:
+            next_x += PADDLE_SPEED * delta_time
+
+        if next_x != self._paddle_x:
+            self._set_paddle_x(next_x)
 
     def _check_brick_collisions(self):
         """检测所有砖块碰撞 / Check all brick collisions."""
@@ -548,6 +598,7 @@ class GameController(QObject):
     def _update(self):
         """游戏主循环 / Main Game Loop"""
         self._ball.update_rotation(FIXED_DELTA_TIME)
+        self._update_paddle(FIXED_DELTA_TIME)
 
         if self._state.gameStatus == GameStatus.PLAYING:
             self._ball.update(FIXED_DELTA_TIME)  # 约 60 FPS
