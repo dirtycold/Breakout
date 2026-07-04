@@ -22,6 +22,7 @@ class RainbowBall(arcade.Sprite):
         super().__init__()
         self.radius = radius
         self.motion = RainbowBallMotion()
+        self.fireball_active = False
 
         # 创建抗锯齿的圆形纹理
         self._create_rainbow_texture()
@@ -41,6 +42,32 @@ class RainbowBall(arcade.Sprite):
     def update_animation(self, delta_time=FIXED_DELTA_TIME):
         """更新彩虹纹理旋转 / Update rainbow texture rotation."""
         self.angle = self.motion.update(delta_time)
+
+    def activate_fireball(self):
+        """激活火球效果 / Activate fireball effect."""
+        self.fireball_active = True
+
+
+class RewardSprite(arcade.SpriteCircle):
+    """自由落体奖励物件 / Free-falling reward object."""
+
+    def __init__(self, reward_type, center_x, center_y, source_dx=0):
+        super().__init__(
+            int(REWARD_RADIUS),
+            REWARD_FIREBALL_COLOR,
+        )
+        self.reward_type = reward_type
+        self.center_x = center_x
+        self.center_y = center_y
+        self.change_x = reward_initial_speed_x(source_dx)
+        self.change_y = REWARD_INITIAL_SPEED_Y
+
+
+def reward_initial_speed_x(source_dx):
+    """根据小球水平运动方向返回奖励水平初速度 / Reward x velocity from ball x direction."""
+    if abs(source_dx) < 1e-6:
+        return 0
+    return math.copysign(REWARD_INITIAL_SPEED_X, source_dx)
 
 
 class RoundedRectBrick(arcade.Sprite):
@@ -170,6 +197,7 @@ class BreakoutGame(arcade.Window):
         self.ball_list = None
         self.brick_list = None
         self.particle_list = None
+        self.reward_list = None
 
         # 移动标志 / Movement flags
         self.left_pressed = False
@@ -224,6 +252,7 @@ class BreakoutGame(arcade.Window):
 
         # 重置粒子效果 / Reset particle effects
         self.particle_list = arcade.SpriteList()
+        self.reward_list = arcade.SpriteList()
 
         # 重置游戏状态 / Reset game state
         self.score = 0
@@ -240,6 +269,20 @@ class BreakoutGame(arcade.Window):
 
         # 绘制挡板 / Draw paddle
         self.paddle_list.draw()
+
+        # 绘制奖励物件 / Draw rewards
+        self.reward_list.draw()
+        for reward in self.reward_list:
+            arcade.draw_text(
+                REWARD_FIREBALL_SYMBOL,
+                reward.center_x,
+                reward.center_y - REWARD_RADIUS / 2,
+                arcade.color.WHITE,
+                int(REWARD_SIZE * 0.7),
+                anchor_x="center",
+                anchor_y="center",
+                bold=True,
+            )
 
         # 绘制球 / Draw ball
         self.ball_list.draw()
@@ -354,6 +397,8 @@ class BreakoutGame(arcade.Window):
         if self.paddle.center_x > SCREEN_WIDTH - PADDLE_WIDTH / 2:
             self.paddle.center_x = SCREEN_WIDTH - PADDLE_WIDTH / 2
 
+        self.update_rewards(delta_time)
+
         # 更新球的位置 / Update ball position
         self.ball.center_x += self.ball.change_x * delta_time
         self.ball.center_y += self.ball.change_y * delta_time
@@ -398,6 +443,9 @@ class BreakoutGame(arcade.Window):
         hit_bricks = arcade.check_for_collision_with_list(self.ball, self.brick_list)
 
         for brick in hit_bricks:
+            incoming_dx = self.ball.change_x
+            incoming_dy = self.ball.change_y
+
             # 计算球心与砖块中心的相对位置 / Calculate ball center relative to brick center
             dx = self.ball.center_x - brick.center_x
             dy = self.ball.center_y - brick.center_y
@@ -429,26 +477,118 @@ class BreakoutGame(arcade.Window):
                 else:
                     self.ball.center_y = brick.center_y - brick_half_height - BALL_RADIUS
 
-            # 移除砖块 / Remove brick
-            brick.remove_from_sprite_lists()
-
-            # 增加分数 / Increase score
-            self.score += SCORE_PER_BRICK
-
-            # 检测胜利 / Check victory
-            if len(self.brick_list) == 0:
-                self.game_status = GameStatus.VICTORY
-
-            # 创建爆炸效果 / Create explosion effect
-            self.create_explosion(brick.center_x, brick.center_y, brick.brick_color)
+            self.destroy_brick_group(brick, incoming_dx, incoming_dy)
             # 只处理第一个碰撞的砖块 / Only handle first collision
             break
 
         # 更新球的彩虹效果 / Update ball rainbow effect
         self.ball.update_animation(delta_time)
 
+        if self.ball.fireball_active:
+            self.create_fireball_trail(self.ball.center_x, self.ball.center_y)
+
         # 更新粒子效果 / Update particle effects
         self.update_particles(delta_time)
+
+    def spawn_reward(self, x, y, source_dx=0):
+        """按概率生成奖励 / Spawn a reward by configured probability."""
+        if random.random() > REWARD_TRIGGER_PROBABILITY:
+            return
+
+        reward = RewardSprite(REWARD_TYPE_FIREBALL, x, y, source_dx)
+        self.reward_list.append(reward)
+
+    def update_rewards(self, delta_time):
+        """更新自由落体奖励并处理接取/销毁 / Update free-falling rewards."""
+        rewards_to_remove = []
+        paddle_bottom = self.paddle.center_y - PADDLE_HEIGHT / 2
+
+        for reward in self.reward_list:
+            reward.center_x += reward.change_x * delta_time
+            reward.center_y += reward.change_y * delta_time
+            reward.change_y -= REWARD_GRAVITY * delta_time
+
+            if reward.center_x - REWARD_RADIUS <= 0:
+                reward.center_x = REWARD_RADIUS
+                reward.change_x = abs(reward.change_x)
+            elif reward.center_x + REWARD_RADIUS >= SCREEN_WIDTH:
+                reward.center_x = SCREEN_WIDTH - REWARD_RADIUS
+                reward.change_x = -abs(reward.change_x)
+
+            if arcade.check_for_collision(reward, self.paddle):
+                self.apply_reward(reward.reward_type)
+                rewards_to_remove.append(reward)
+            elif reward.center_y + REWARD_RADIUS < paddle_bottom:
+                rewards_to_remove.append(reward)
+
+        for reward in rewards_to_remove:
+            reward.remove_from_sprite_lists()
+
+    def apply_reward(self, reward_type):
+        """接受奖励效果 / Apply a collected reward effect."""
+        if reward_type == REWARD_TYPE_FIREBALL:
+            self.ball.activate_fireball()
+
+    def destroy_brick_group(self, hit_brick, direction_x=0, direction_y=0):
+        """销毁命中砖块，火球状态下沿运动方向额外销毁砖块 / Destroy fireball path."""
+        if self.ball.fireball_active:
+            bricks_to_destroy = self.bricks_in_fireball_path(hit_brick, direction_x, direction_y)
+        else:
+            bricks_to_destroy = [hit_brick]
+
+        for brick in bricks_to_destroy:
+            if not brick.sprite_lists:
+                continue
+
+            brick_x = brick.center_x
+            brick_y = brick.center_y
+            brick_color = brick.brick_color
+            brick.remove_from_sprite_lists()
+
+            self.score += SCORE_PER_BRICK
+            self.create_explosion(brick_x, brick_y, brick_color)
+            self.spawn_reward(brick_x, brick_y, direction_x)
+
+        if len(self.brick_list) == 0:
+            self.game_status = GameStatus.VICTORY
+
+    def bricks_in_fireball_path(self, source_brick, direction_x, direction_y):
+        """返回火球运动方向上的最多 4 块砖 / Return up to 4 bricks along fireball direction."""
+        speed = math.hypot(direction_x, direction_y)
+        if speed <= 1e-6:
+            return [source_brick]
+
+        dir_x = direction_x / speed
+        dir_y = direction_y / speed
+        candidates = []
+
+        for brick in list(self.brick_list):
+            if brick is source_brick:
+                continue
+
+            offset_x = brick.center_x - source_brick.center_x
+            offset_y = brick.center_y - source_brick.center_y
+            projection = offset_x * dir_x + offset_y * dir_y
+            if projection <= 0:
+                continue
+
+            perpendicular = abs(offset_x * dir_y - offset_y * dir_x)
+            if perpendicular <= FIREBALL_PATH_WIDTH:
+                candidates.append((projection, perpendicular, brick))
+
+        candidates.sort(key=lambda item: (item[0], item[1]))
+        return [
+            source_brick,
+            *[brick for _, _, brick in candidates[:FIREBALL_PATH_EXTRA_BRICKS]],
+        ]
+
+    def bricks_near(self, source_brick):
+        """兼容测试：返回火球路径候选砖块 / Compatibility helper for path bricks."""
+        return self.bricks_in_fireball_path(
+            source_brick,
+            self.ball.change_x,
+            self.ball.change_y,
+        )
 
     def create_explosion(self, x, y, color):
         """创建爆炸粒子效果 / Create explosion particle effect"""
@@ -472,11 +612,33 @@ class BreakoutGame(arcade.Window):
             # 添加到粒子列表 / Add to particle list
             self.particle_list.append(particle)
 
+    def create_fireball_trail(self, x, y):
+        """创建火球尾焰粒子 / Create fireball flame trail particles."""
+        for _ in range(FIREBALL_TRAIL_PARTICLE_COUNT):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(FIREBALL_TRAIL_MIN_SPEED, FIREBALL_TRAIL_MAX_SPEED)
+            color = random.choice(FIREBALL_TRAIL_COLORS)
+
+            particle = arcade.SpriteCircle(FIREBALL_TRAIL_PARTICLE_RADIUS, color)
+            particle.center_x = x + random.uniform(-BALL_RADIUS / 2, BALL_RADIUS / 2)
+            particle.center_y = y + random.uniform(-BALL_RADIUS / 2, BALL_RADIUS / 2)
+            particle.change_x = math.cos(angle) * speed
+            particle.change_y = math.sin(angle) * speed
+            particle.alpha = 210
+            particle.age = 0
+            particle.lifetime = FIREBALL_TRAIL_PARTICLE_LIFETIME
+            particle.gravity = FIREBALL_TRAIL_GRAVITY
+
+            self.particle_list.append(particle)
+
     def update_particles(self, delta_time):
         """更新所有粒子 / Update all particles"""
         particles_to_remove = []
 
         for particle in self.particle_list:
+            lifetime = getattr(particle, "lifetime", PARTICLE_LIFETIME)
+            gravity = getattr(particle, "gravity", PARTICLE_GRAVITY)
+
             # 更新年龄 / Update age
             particle.age += delta_time
 
@@ -485,14 +647,14 @@ class BreakoutGame(arcade.Window):
             particle.center_y += particle.change_y * delta_time
 
             # 应用重力 / Apply gravity
-            particle.change_y -= PARTICLE_GRAVITY * delta_time
+            particle.change_y -= gravity * delta_time
 
             # 淡出效果 / Fade out effect
-            fade = 1 - (particle.age / PARTICLE_LIFETIME)
+            fade = 1 - (particle.age / lifetime)
             particle.alpha = int(255 * max(0, fade))
 
             # 标记要移除的粒子 / Mark particles for removal
-            if particle.age >= PARTICLE_LIFETIME:
+            if particle.age >= lifetime:
                 particles_to_remove.append(particle)
 
         # 移除过期粒子 / Remove expired particles

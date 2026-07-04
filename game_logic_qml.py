@@ -32,6 +32,13 @@ def getBrickColors():
     return BRICK_COLORS_HEX
 
 
+def reward_initial_speed_x(source_dx):
+    """根据小球水平运动方向返回奖励水平初速度 / Reward x velocity from ball x direction."""
+    if abs(source_dx) < 1e-6:
+        return 0
+    return math.copysign(REWARD_INITIAL_SPEED_X, source_dx)
+
+
 class BrickModel(QAbstractListModel):
     """砖块模型 / Brick Model"""
 
@@ -120,6 +127,44 @@ class BrickModel(QAbstractListModel):
             if not brick["destroyed"]:
                 yield row, brick
 
+    def active_rows_in_fireball_path(self, source_row, direction_x, direction_y):
+        """返回火球运动方向上的最多 4 块砖 / Return up to 4 brick rows along fireball direction."""
+        if not 0 <= source_row < len(self._bricks):
+            return []
+
+        speed = math.hypot(direction_x, direction_y)
+        if speed <= 1e-6:
+            return [source_row]
+
+        source = self._bricks[source_row]
+        source_center_x = source["x"] + source["width"] / 2
+        source_center_y = source["y"] + source["height"] / 2
+        dir_x = direction_x / speed
+        dir_y = direction_y / speed
+        candidates = []
+
+        for row, brick in enumerate(self._bricks):
+            if row == source_row or brick["destroyed"]:
+                continue
+
+            brick_center_x = brick["x"] + brick["width"] / 2
+            brick_center_y = brick["y"] + brick["height"] / 2
+            offset_x = brick_center_x - source_center_x
+            offset_y = brick_center_y - source_center_y
+            projection = offset_x * dir_x + offset_y * dir_y
+            if projection <= 0:
+                continue
+
+            perpendicular = abs(offset_x * dir_y - offset_y * dir_x)
+            if perpendicular <= FIREBALL_PATH_WIDTH:
+                candidates.append((projection, perpendicular, row))
+
+        candidates.sort(key=lambda item: (item[0], item[1]))
+        return [
+            source_row,
+            *[row for _, _, row in candidates[:FIREBALL_PATH_EXTRA_BRICKS]],
+        ]
+
 
 class ParticleModel(QAbstractListModel):
     """粒子模型 / Particle Model"""
@@ -194,7 +239,32 @@ class ParticleModel(QAbstractListModel):
                 "vx": math.cos(angle) * speed,
                 "vy": math.sin(angle) * speed,
                 "age": 0.0,
+                "lifetime": PARTICLE_LIFETIME,
+                "gravity": PARTICLE_GRAVITY,
                 "color": color,
+                "opacity": 1.0,
+            })
+
+        self.endInsertRows()
+
+    def create_fireball_trail(self, x, y):
+        """创建火球尾焰粒子 / Create fireball trail particles."""
+        start_row = len(self._particles)
+        end_row = start_row + FIREBALL_TRAIL_PARTICLE_COUNT - 1
+        self.beginInsertRows(QModelIndex(), start_row, end_row)
+
+        for _ in range(FIREBALL_TRAIL_PARTICLE_COUNT):
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(FIREBALL_TRAIL_MIN_SPEED, FIREBALL_TRAIL_MAX_SPEED)
+            self._particles.append({
+                "x": x - FIREBALL_TRAIL_PARTICLE_RADIUS + random.uniform(-BALL_RADIUS / 2, BALL_RADIUS / 2),
+                "y": y - FIREBALL_TRAIL_PARTICLE_RADIUS + random.uniform(-BALL_RADIUS / 2, BALL_RADIUS / 2),
+                "vx": math.cos(angle) * speed,
+                "vy": math.sin(angle) * speed,
+                "age": 0.0,
+                "lifetime": FIREBALL_TRAIL_PARTICLE_LIFETIME,
+                "gravity": FIREBALL_TRAIL_GRAVITY,
+                "color": random.choice(FIREBALL_TRAIL_COLORS_HEX),
                 "opacity": 1.0,
             })
 
@@ -208,8 +278,9 @@ class ParticleModel(QAbstractListModel):
         for row in range(len(self._particles) - 1, -1, -1):
             particle = self._particles[row]
             particle["age"] += delta_time
+            lifetime = particle.get("lifetime", PARTICLE_LIFETIME)
 
-            if particle["age"] >= PARTICLE_LIFETIME:
+            if particle["age"] >= lifetime:
                 self.beginRemoveRows(QModelIndex(), row, row)
                 self._particles.pop(row)
                 self.endRemoveRows()
@@ -217,8 +288,8 @@ class ParticleModel(QAbstractListModel):
 
             particle["x"] += particle["vx"] * delta_time
             particle["y"] += particle["vy"] * delta_time
-            particle["vy"] += PARTICLE_GRAVITY * delta_time
-            particle["opacity"] = max(0.0, 1.0 - particle["age"] / PARTICLE_LIFETIME)
+            particle["vy"] += particle.get("gravity", PARTICLE_GRAVITY) * delta_time
+            particle["opacity"] = max(0.0, 1.0 - particle["age"] / lifetime)
 
         if self._particles:
             top_left = self.index(0, 0)
@@ -228,6 +299,135 @@ class ParticleModel(QAbstractListModel):
                 self.PARTICLE_Y_ROLE,
                 self.PARTICLE_OPACITY_ROLE,
             ])
+
+
+class RewardModel(QAbstractListModel):
+    """奖励物件模型 / Reward object model."""
+
+    REWARD_X_ROLE = int(Qt.ItemDataRole.UserRole) + 1
+    REWARD_Y_ROLE = REWARD_X_ROLE + 1
+    REWARD_SIZE_ROLE = REWARD_X_ROLE + 2
+    REWARD_COLOR_ROLE = REWARD_X_ROLE + 3
+    REWARD_BORDER_COLOR_ROLE = REWARD_X_ROLE + 4
+    REWARD_SYMBOL_ROLE = REWARD_X_ROLE + 5
+
+    ROLE_NAMES = {
+        REWARD_X_ROLE: b"rewardX",
+        REWARD_Y_ROLE: b"rewardY",
+        REWARD_SIZE_ROLE: b"rewardSize",
+        REWARD_COLOR_ROLE: b"rewardColor",
+        REWARD_BORDER_COLOR_ROLE: b"rewardBorderColor",
+        REWARD_SYMBOL_ROLE: b"rewardSymbol",
+    }
+
+    ROLE_KEYS = {
+        REWARD_X_ROLE: "x",
+        REWARD_Y_ROLE: "y",
+        REWARD_SIZE_ROLE: "size",
+        REWARD_COLOR_ROLE: "color",
+        REWARD_BORDER_COLOR_ROLE: "borderColor",
+        REWARD_SYMBOL_ROLE: "symbol",
+    }
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._rewards = []
+
+    def rowCount(self, parent=QModelIndex()):
+        if parent.isValid():
+            return 0
+        return len(self._rewards)
+
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if not index.isValid() or not 0 <= index.row() < len(self._rewards):
+            return None
+
+        key = self.ROLE_KEYS.get(int(role))
+        if key is None:
+            return None
+
+        return self._rewards[index.row()][key]
+
+    def roleNames(self):
+        return {
+            role: QByteArray(name)
+            for role, name in self.ROLE_NAMES.items()
+        }
+
+    def clear(self):
+        if not self._rewards:
+            return
+
+        self.beginResetModel()
+        self._rewards = []
+        self.endResetModel()
+
+    def create_fireball_reward(self, center_x, center_y, source_dx=0):
+        """创建火球奖励 / Create a fireball reward."""
+        row = len(self._rewards)
+        self.beginInsertRows(QModelIndex(), row, row)
+        self._rewards.append({
+            "type": REWARD_TYPE_FIREBALL,
+            "x": center_x - REWARD_RADIUS,
+            "y": center_y - REWARD_RADIUS,
+            "vx": reward_initial_speed_x(source_dx),
+            "vy": -REWARD_INITIAL_SPEED_Y,
+            "size": REWARD_SIZE,
+            "color": REWARD_FIREBALL_COLOR_HEX,
+            "borderColor": REWARD_FIREBALL_BORDER_COLOR_HEX,
+            "symbol": REWARD_FIREBALL_SYMBOL,
+        })
+        self.endInsertRows()
+
+    def update_rewards(self, delta_time, paddle_x, paddle_y, paddle_width):
+        """更新奖励位置，并返回接取的奖励类型 / Update rewards and return collected types."""
+        collected_types = []
+        if not self._rewards:
+            return collected_types
+
+        for row in range(len(self._rewards) - 1, -1, -1):
+            reward = self._rewards[row]
+            reward["x"] += reward["vx"] * delta_time
+            reward["y"] += reward["vy"] * delta_time
+            reward["vy"] += REWARD_GRAVITY * delta_time
+
+            if reward["x"] <= 0:
+                reward["x"] = 0
+                reward["vx"] = abs(reward["vx"])
+            elif reward["x"] + reward["size"] >= SCREEN_WIDTH:
+                reward["x"] = SCREEN_WIDTH - reward["size"]
+                reward["vx"] = -abs(reward["vx"])
+
+            if self._collides_with_paddle(reward, paddle_x, paddle_y, paddle_width):
+                collected_types.append(reward["type"])
+                self._remove_reward(row)
+            elif reward["y"] > paddle_y + PADDLE_HEIGHT:
+                self._remove_reward(row)
+
+        if self._rewards:
+            top_left = self.index(0, 0)
+            bottom_right = self.index(len(self._rewards) - 1, 0)
+            self.dataChanged.emit(top_left, bottom_right, [
+                self.REWARD_X_ROLE,
+                self.REWARD_Y_ROLE,
+            ])
+
+        return collected_types
+
+    def _collides_with_paddle(self, reward, paddle_x, paddle_y, paddle_width):
+        reward_right = reward["x"] + reward["size"]
+        reward_bottom = reward["y"] + reward["size"]
+        return (
+            reward_right >= paddle_x and
+            reward["x"] <= paddle_x + paddle_width and
+            reward_bottom >= paddle_y and
+            reward["y"] <= paddle_y + PADDLE_HEIGHT
+        )
+
+    def _remove_reward(self, row):
+        self.beginRemoveRows(QModelIndex(), row, row)
+        self._rewards.pop(row)
+        self.endRemoveRows()
 
 
 class GameState(QObject):
@@ -299,6 +499,7 @@ class Ball(QObject):
         self._dx = 0
         self._dy = 0
         self._active = False
+        self._fireball_active = False
         self._motion = RainbowBallMotion()
         self._rotation = self._motion.rotation
         self._texture_source = create_rainbow_ball_data_url(BALL_RADIUS)
@@ -393,10 +594,19 @@ class Ball(QObject):
         self._dx = 0
         self._dy = 0
         self._active = False
+        self._fireball_active = False
         self._motion.reset()
         self._rotation = self._motion.rotation
         self.positionChanged.emit(self._x, self._y)
         self.rotationChanged.emit(self._rotation)
+
+    def activate_fireball(self):
+        """激活火球效果 / Activate fireball effect."""
+        self._fireball_active = True
+
+    @property
+    def fireball_active(self):
+        return self._fireball_active
 
     @Slot(float, float)
     def followPaddle(self, paddle_x, paddle_width):
@@ -418,6 +628,7 @@ class GameController(QObject):
         self._ball = Ball(self)
         self._brick_model = BrickModel(self)
         self._particle_model = ParticleModel(self)
+        self._reward_model = RewardModel(self)
         self._paddle_x = (SCREEN_WIDTH - PADDLE_WIDTH) / 2
         self._paddle_y = qml_paddle_y()
         self._paddle_width = PADDLE_WIDTH
@@ -457,6 +668,11 @@ class GameController(QObject):
         """粒子模型"""
         return self._particle_model
 
+    @Property(QObject, constant=True)
+    def rewardModel(self):
+        """奖励物件模型"""
+        return self._reward_model
+
     @Slot()
     def startGame(self):
         """开始游戏 / Start Game"""
@@ -476,6 +692,7 @@ class GameController(QObject):
         self._ball.reset()
         self._brick_model.reset_bricks()
         self._particle_model.clear()
+        self._reward_model.clear()
         self._state.score = 0
         self._state.gameStatus = GameStatus.NOT_STARTED
         self._state.message = MESSAGE_START
@@ -537,24 +754,40 @@ class GameController(QObject):
             return False
 
         for row, brick in self._brick_model.active_brick_rows():
+            incoming_dx = self._ball._dx
+            incoming_dy = self._ball._dy
+
             if self._check_single_brick_collision(brick):
-                self._brick_model.destroy_brick(row)
-                self._state.score += SCORE_PER_BRICK
-                self._state.brickCount -= 1
-
-                self._particle_model.create_explosion(
-                    brick["x"] + brick["width"] / 2,
-                    brick["y"] + brick["height"] / 2,
-                    brick["color"]
-                )
-
-                if self._state.brickCount <= 0:
-                    self._state.gameStatus = GameStatus.VICTORY
-                    self._state.message = MESSAGE_VICTORY
-
+                self._destroy_brick_group(row, incoming_dx, incoming_dy)
                 return True
 
         return False
+
+    def _destroy_brick_group(self, hit_row, direction_x=0, direction_y=0):
+        """销毁命中砖块，火球状态下沿运动方向额外销毁砖块 / Destroy fireball path."""
+        if self._ball.fireball_active:
+            rows_to_destroy = self._brick_model.active_rows_in_fireball_path(hit_row, direction_x, direction_y)
+        else:
+            rows_to_destroy = [hit_row]
+
+        for row in rows_to_destroy:
+            brick = self._brick_model.brick_at(row)
+            if brick["destroyed"]:
+                continue
+
+            center_x = brick["x"] + brick["width"] / 2
+            center_y = brick["y"] + brick["height"] / 2
+            self._brick_model.destroy_brick(row)
+            self._state.score += SCORE_PER_BRICK
+            self._state.brickCount -= 1
+
+            self._particle_model.create_explosion(center_x, center_y, brick["color"])
+            if random.random() <= REWARD_TRIGGER_PROBABILITY:
+                self._reward_model.create_fireball_reward(center_x, center_y, direction_x)
+
+        if self._state.brickCount <= 0:
+            self._state.gameStatus = GameStatus.VICTORY
+            self._state.message = MESSAGE_VICTORY
 
     def _check_single_brick_collision(self, brick):
         """检测单个砖块并处理反弹 / Check one brick and bounce the ball."""
@@ -601,6 +834,15 @@ class GameController(QObject):
         self._update_paddle(FIXED_DELTA_TIME)
 
         if self._state.gameStatus == GameStatus.PLAYING:
+            for reward_type in self._reward_model.update_rewards(
+                FIXED_DELTA_TIME,
+                self._paddle_x,
+                self._paddle_y,
+                self._paddle_width,
+            ):
+                if reward_type == REWARD_TYPE_FIREBALL:
+                    self._ball.activate_fireball()
+
             self._ball.update(FIXED_DELTA_TIME)  # 约 60 FPS
             self._ball.checkPaddleCollision(
                 self._paddle_x,
@@ -608,6 +850,9 @@ class GameController(QObject):
                 self._paddle_width
             )
             self._check_brick_collisions()
+
+            if self._ball.fireball_active:
+                self._particle_model.create_fireball_trail(self._ball.x, self._ball.y)
 
             # 检测掉落 / Check if Ball Fell
             if self._ball.isOutOfBounds():

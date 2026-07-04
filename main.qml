@@ -97,6 +97,39 @@ Window {
             }  // Repeater 结束
         }  // Item (brickContainer) 结束
 
+        // 奖励物件
+        Item {
+            id: rewardContainer
+            anchors.fill: parent
+
+            Repeater {
+                model: gameController.rewardModel
+
+                delegate: Item {
+                    x: model.rewardX
+                    y: model.rewardY
+                    width: model.rewardSize
+                    height: model.rewardSize
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: model.rewardColor
+                        border.color: model.rewardBorderColor
+                        border.width: 2
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: model.rewardSymbol
+                        color: "white"
+                        font.pixelSize: parent.width * 0.62
+                        font.bold: true
+                    }
+                }
+            }
+        }
+
         // 挡板
         Rectangle {
             id: paddle
