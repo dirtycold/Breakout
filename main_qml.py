@@ -105,6 +105,10 @@ class GameConfigProvider(QObject):
         )
 
     @Property(str, constant=True)
+    def gameFontFamily(self):
+        return GAME_FONT_FAMILY
+
+    @Property(str, constant=True)
     def scoreLabel(self):
         return SCORE_LABEL
 

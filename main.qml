@@ -124,6 +124,7 @@ Window {
                         text: model.rewardSymbol
                         color: "white"
                         font.pixelSize: parent.width * 0.62
+                        font.family: config.gameFontFamily
                         font.bold: true
                     }
                 }
@@ -228,6 +229,7 @@ Window {
             anchors.topMargin: config.scoreMarginTop
             text: gameController && gameController.state ? config.scoreLabel + ": " + gameController.state.score : config.scoreLabel + ": 0"
             font.pixelSize: config.scoreFontSize
+            font.family: config.gameFontFamily
             color: "white"
         }
 
@@ -247,6 +249,7 @@ Window {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: messageOverlay.messageLine(0)
                 font.pixelSize: config.messagePrimaryFontSize
+                font.family: config.gameFontFamily
                 color: "white"
                 horizontalAlignment: Text.AlignHCenter
             }
@@ -255,6 +258,7 @@ Window {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: messageOverlay.messageLine(1)
                 font.pixelSize: config.messageSecondaryFontSize
+                font.family: config.gameFontFamily
                 color: "white"
                 horizontalAlignment: Text.AlignHCenter
                 visible: text.length > 0
@@ -264,6 +268,7 @@ Window {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: messageOverlay.messageLine(2)
                 font.pixelSize: config.messageHintFontSize
+                font.family: config.gameFontFamily
                 color: "white"
                 horizontalAlignment: Text.AlignHCenter
                 visible: text.length > 0

@@ -279,6 +279,7 @@ class BreakoutGame(arcade.Window):
                 reward.center_y - REWARD_RADIUS / 2,
                 arcade.color.WHITE,
                 int(REWARD_SIZE * 0.7),
+                font_name=GAME_FONT_FAMILY,
                 anchor_x="center",
                 anchor_y="center",
                 bold=True,
@@ -293,9 +294,10 @@ class BreakoutGame(arcade.Window):
         # 绘制分数 / Draw score
         arcade.draw_text(
             f"{SCORE_LABEL}: {self.score}",
-            10, SCREEN_HEIGHT - 30,
+            SCORE_MARGIN_X, SCREEN_HEIGHT - SCORE_MARGIN_TOP - SCORE_FONT_SIZE,
             arcade.color.WHITE,
-            SCORE_FONT_SIZE
+            SCORE_FONT_SIZE,
+            font_name=GAME_FONT_FAMILY,
         )
 
         # 如果游戏未开始，显示开始提示 / Show start message if game hasn't started
@@ -305,6 +307,7 @@ class BreakoutGame(arcade.Window):
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
                 arcade.color.WHITE,
                 MESSAGE_PRIMARY_FONT_SIZE,
+                font_name=GAME_FONT_FAMILY,
                 anchor_x="center"
             )
             arcade.draw_text(
@@ -312,6 +315,7 @@ class BreakoutGame(arcade.Window):
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40,
                 arcade.color.WHITE,
                 MESSAGE_SECONDARY_FONT_SIZE,
+                font_name=GAME_FONT_FAMILY,
                 anchor_x="center"
             )
             arcade.draw_text(
@@ -319,6 +323,7 @@ class BreakoutGame(arcade.Window):
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 80,
                 arcade.color.WHITE,
                 MESSAGE_HINT_FONT_SIZE,
+                font_name=GAME_FONT_FAMILY,
                 anchor_x="center"
             )
 
@@ -329,6 +334,7 @@ class BreakoutGame(arcade.Window):
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
                 arcade.color.WHITE,
                 MESSAGE_PRIMARY_FONT_SIZE,
+                font_name=GAME_FONT_FAMILY,
                 anchor_x="center"
             )
             arcade.draw_text(
@@ -336,6 +342,7 @@ class BreakoutGame(arcade.Window):
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40,
                 arcade.color.WHITE,
                 MESSAGE_SECONDARY_FONT_SIZE,
+                font_name=GAME_FONT_FAMILY,
                 anchor_x="center"
             )
 
@@ -346,6 +353,7 @@ class BreakoutGame(arcade.Window):
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
                 arcade.color.WHITE,
                 MESSAGE_PRIMARY_FONT_SIZE,
+                font_name=GAME_FONT_FAMILY,
                 anchor_x="center"
             )
             arcade.draw_text(
@@ -353,6 +361,7 @@ class BreakoutGame(arcade.Window):
                 SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40,
                 arcade.color.WHITE,
                 MESSAGE_SECONDARY_FONT_SIZE,
+                font_name=GAME_FONT_FAMILY,
                 anchor_x="center"
             )
 
