@@ -26,10 +26,11 @@ from qtpy.QtCore import (
 from ball_texture import RainbowBallMotion, create_rainbow_ball_data_url
 from constants import *
 from fireball_effect import inside_fireball_impact_area
+from paddle_texture import create_paddle_sprite_sheet_data_url
 from reward_visual import (
-    create_fireball_reward_data_url,
+    choose_reward_type,
+    create_reward_data_url,
     create_reward_motion,
-    should_spawn_reward,
 )
 
 # 导出颜色列表供 QML 使用
@@ -355,13 +356,13 @@ class RewardModel(QAbstractListModel):
         self._rewards = []
         self.endResetModel()
 
-    def create_fireball_reward(self, center_x, center_y, source_dx=0):
-        """创建火球奖励 / Create a fireball reward."""
+    def create_reward(self, reward_type, center_x, center_y, source_dx=0):
+        """创建指定类型的奖励 / Create a reward of the selected type."""
         motion = create_reward_motion(source_dx)
         row = len(self._rewards)
         self.beginInsertRows(QModelIndex(), row, row)
         self._rewards.append({
-            "type": REWARD_TYPE_FIREBALL,
+            "type": reward_type,
             "x": center_x - REWARD_RADIUS,
             "y": center_y - REWARD_RADIUS,
             "vx": motion.vx,
@@ -370,9 +371,13 @@ class RewardModel(QAbstractListModel):
             "rotation": motion.angle,
             "angularVelocity": motion.angular_velocity,
             "size": REWARD_SIZE,
-            "texture": create_fireball_reward_data_url(),
+            "texture": create_reward_data_url(reward_type),
         })
         self.endInsertRows()
+
+    def create_fireball_reward(self, center_x, center_y, source_dx=0):
+        """Compatibility wrapper for creating a fireball reward."""
+        self.create_reward(REWARD_TYPE_FIREBALL, center_x, center_y, source_dx)
 
     def update_rewards(self, delta_time, paddle_x, paddle_y, paddle_width):
         """更新奖励位置，并返回接取的奖励类型 / Update rewards and return collected types."""
@@ -620,6 +625,7 @@ class GameController(QObject):
     """游戏主控制器 / Main Game Controller"""
 
     paddleXChanged = Signal(float)
+    paddleWidthChanged = Signal(float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -662,6 +668,21 @@ class GameController(QObject):
         """挡板左上角 X / Paddle left x."""
         return self._paddle_x
 
+    @Property(float, notify=paddleWidthChanged)
+    def paddleWidth(self):
+        """当前挡板宽度 / Current paddle width."""
+        return self._paddle_width
+
+    @Property(str, notify=paddleWidthChanged)
+    def paddleTextureSource(self):
+        """当前宽度对应的固定牙齿挡板图集 / Width-specific paddle atlas."""
+        return create_paddle_sprite_sheet_data_url(
+            self._paddle_width,
+            PADDLE_HEIGHT,
+            PADDLE_CORNER_RADIUS,
+            PADDLE_GRADIENT_FRAME_COUNT,
+        )
+
     @Property(QObject, constant=True)
     def particleModel(self):
         """粒子模型"""
@@ -685,7 +706,8 @@ class GameController(QObject):
     @Slot()
     def resetGame(self):
         """重置游戏 / Reset Game"""
-        self._set_paddle_x((SCREEN_WIDTH - self._paddle_width) / 2, force=True)
+        self._set_paddle_width(PADDLE_WIDTH)
+        self._set_paddle_x((SCREEN_WIDTH - PADDLE_WIDTH) / 2, force=True)
         self._paddle_move_left = False
         self._paddle_move_right = False
         self._ball.reset()
@@ -703,7 +725,7 @@ class GameController(QObject):
     def updatePaddle(self, paddle_x, paddle_y, paddle_width):
         """更新挡板位置 / Update paddle position."""
         self._paddle_y = paddle_y
-        self._paddle_width = paddle_width
+        self._set_paddle_width(paddle_width)
         self._set_paddle_x(paddle_x)
 
     @Slot(float)
@@ -734,6 +756,27 @@ class GameController(QObject):
             return True
 
         return False
+
+    def _set_paddle_width(self, paddle_width):
+        """调整挡板宽度并保持中心位置 / Resize the paddle around its center."""
+        new_width = max(PADDLE_MIN_WIDTH, min(PADDLE_MAX_WIDTH, paddle_width))
+        if new_width == self._paddle_width:
+            return False
+
+        center_x = self._paddle_x + self._paddle_width / 2
+        self._paddle_width = new_width
+        self.paddleWidthChanged.emit(self._paddle_width)
+        self._set_paddle_x(center_x - self._paddle_width / 2, force=True)
+        return True
+
+    def _apply_reward(self, reward_type):
+        """应用接取的奖励 / Apply a collected reward."""
+        if reward_type == REWARD_TYPE_FIREBALL:
+            self._ball.activate_fireball()
+        elif reward_type == REWARD_TYPE_EXTEND_PADDLE:
+            self._set_paddle_width(self._paddle_width + PADDLE_REWARD_SIZE_STEP)
+        elif reward_type == REWARD_TYPE_SHRINK_PADDLE:
+            self._set_paddle_width(self._paddle_width - PADDLE_REWARD_SIZE_STEP)
 
     def _update_paddle(self, delta_time):
         """按当前方向状态更新挡板 / Update paddle from current direction state."""
@@ -781,8 +824,9 @@ class GameController(QObject):
             self._state.brickCount -= 1
 
             self._particle_model.create_explosion(center_x, center_y, brick["color"])
-            if should_spawn_reward():
-                self._reward_model.create_fireball_reward(center_x, center_y, direction_x)
+            reward_type = choose_reward_type()
+            if reward_type is not None:
+                self._reward_model.create_reward(reward_type, center_x, center_y, direction_x)
 
         if self._state.brickCount <= 0:
             self._state.gameStatus = GameStatus.VICTORY
@@ -839,8 +883,7 @@ class GameController(QObject):
                 self._paddle_y,
                 self._paddle_width,
             ):
-                if reward_type == REWARD_TYPE_FIREBALL:
-                    self._ball.activate_fireball()
+                self._apply_reward(reward_type)
 
             self._ball.update(FIXED_DELTA_TIME)  # 约 60 FPS
             self._ball.checkPaddleCollision(

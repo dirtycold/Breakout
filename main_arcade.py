@@ -80,9 +80,9 @@ from constants import *
 from fireball_effect import inside_fireball_impact_area
 from paddle_texture import create_paddle_image
 from reward_visual import (
-    create_fireball_reward_image,
+    choose_reward_type,
+    create_reward_image,
     create_reward_motion,
-    should_spawn_reward,
 )
 
 
@@ -125,8 +125,8 @@ class RewardSprite(arcade.Sprite):
     def __init__(self, reward_type, center_x, center_y, source_dx=0):
         super().__init__()
         self.texture = arcade.Texture(
-            image=create_fireball_reward_image(),
-            name=f"fireball_reward_{id(self)}",
+            image=create_reward_image(reward_type),
+            name=f"{reward_type}_reward_{id(self)}",
         )
         self.width = REWARD_SIZE
         self.height = REWARD_SIZE
@@ -249,6 +249,18 @@ class RoundedRectPaddle(arcade.Sprite):
         if next_frame_index != self._frame_index:
             self._frame_index = next_frame_index
             self.texture = self._texture_frames[self._frame_index]
+
+    def set_paddle_width(self, width):
+        """Swap to a width-specific atlas while keeping every fang unscaled."""
+        if width == self.paddle_width:
+            return
+
+        self.paddle_width = width
+        self._texture_frames = self._get_texture_frames()
+        self._frame_index %= len(self._texture_frames)
+        self.texture = self._texture_frames[self._frame_index]
+        self.width = self.paddle_width
+        self.height = self.paddle_height
 
 
 class BreakoutGame(arcade.Window):
@@ -443,10 +455,7 @@ class BreakoutGame(arcade.Window):
                 self.paddle.center_x += PADDLE_SPEED * delta_time
 
             # 限制挡板在屏幕内 / Keep paddle on screen
-            if self.paddle.center_x < PADDLE_WIDTH / 2:
-                self.paddle.center_x = PADDLE_WIDTH / 2
-            if self.paddle.center_x > SCREEN_WIDTH - PADDLE_WIDTH / 2:
-                self.paddle.center_x = SCREEN_WIDTH - PADDLE_WIDTH / 2
+            self.clamp_paddle_to_screen()
 
             # 球跟随挡板移动 / Ball follows paddle
             self.ball.center_x = self.paddle.center_x
@@ -460,10 +469,7 @@ class BreakoutGame(arcade.Window):
             self.paddle.center_x += PADDLE_SPEED * delta_time
 
         # 限制挡板在屏幕内 / Keep paddle on screen
-        if self.paddle.center_x < PADDLE_WIDTH / 2:
-            self.paddle.center_x = PADDLE_WIDTH / 2
-        if self.paddle.center_x > SCREEN_WIDTH - PADDLE_WIDTH / 2:
-            self.paddle.center_x = SCREEN_WIDTH - PADDLE_WIDTH / 2
+        self.clamp_paddle_to_screen()
 
         self.update_rewards(delta_time)
 
@@ -560,10 +566,11 @@ class BreakoutGame(arcade.Window):
 
     def spawn_reward(self, x, y, source_dx=0):
         """按概率生成奖励 / Spawn a reward by configured probability."""
-        if not should_spawn_reward():
+        reward_type = choose_reward_type()
+        if reward_type is None:
             return
 
-        reward = RewardSprite(REWARD_TYPE_FIREBALL, x, y, source_dx)
+        reward = RewardSprite(reward_type, x, y, source_dx)
         self.reward_list.append(reward)
 
     def update_rewards(self, delta_time):
@@ -597,6 +604,24 @@ class BreakoutGame(arcade.Window):
         """接受奖励效果 / Apply a collected reward effect."""
         if reward_type == REWARD_TYPE_FIREBALL:
             self.ball.activate_fireball()
+        elif reward_type == REWARD_TYPE_EXTEND_PADDLE:
+            self.resize_paddle(self.paddle.width + PADDLE_REWARD_SIZE_STEP)
+        elif reward_type == REWARD_TYPE_SHRINK_PADDLE:
+            self.resize_paddle(self.paddle.width - PADDLE_REWARD_SIZE_STEP)
+
+    def resize_paddle(self, width):
+        """调整挡板宽度并保持中心位置 / Resize paddle around its center."""
+        new_width = max(PADDLE_MIN_WIDTH, min(PADDLE_MAX_WIDTH, width))
+        self.paddle.set_paddle_width(new_width)
+        self.clamp_paddle_to_screen()
+
+    def clamp_paddle_to_screen(self):
+        """根据当前动态宽度限制挡板 / Clamp using the current dynamic width."""
+        half_width = self.paddle.width / 2
+        self.paddle.center_x = max(
+            half_width,
+            min(SCREEN_WIDTH - half_width, self.paddle.center_x),
+        )
 
     def destroy_brick_group(self, hit_brick, direction_x=0, direction_y=0):
         """销毁命中砖块，火球状态下沿运动方向额外销毁砖块 / Destroy fireball path."""
@@ -760,10 +785,7 @@ class BreakoutGame(arcade.Window):
         self.paddle.center_x = x
 
         # 限制挡板在屏幕内 / Keep paddle on screen
-        if self.paddle.center_x < PADDLE_WIDTH / 2:
-            self.paddle.center_x = PADDLE_WIDTH / 2
-        if self.paddle.center_x > SCREEN_WIDTH - PADDLE_WIDTH / 2:
-            self.paddle.center_x = SCREEN_WIDTH - PADDLE_WIDTH / 2
+        self.clamp_paddle_to_screen()
 
         # 如果游戏未开始，球跟随挡板 / If game hasn't started, ball follows paddle
         if self.game_status == GameStatus.NOT_STARTED:

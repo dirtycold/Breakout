@@ -140,7 +140,7 @@ Window {
         // 挡板
         Rectangle {
             id: paddle
-            width: config.paddleWidth
+            width: gameController.paddleWidth
             height: config.paddleHeight
             color: "transparent"
             radius: config.paddleCornerRadius
@@ -157,11 +157,11 @@ Window {
 
                 Image {
                     id: paddleTexture
-                    x: -paddle.frameIndex * config.paddleWidth
+                    x: -paddle.frameIndex * paddle.width
                     y: 0
-                    width: config.paddleWidth * config.paddleGradientFrameCount
+                    width: paddle.width * config.paddleGradientFrameCount
                     height: config.paddleHeight
-                    source: config.paddleSpriteSheetSource
+                    source: gameController.paddleTextureSource
                     fillMode: Image.Stretch
                     smooth: false
                     cache: true

@@ -6,9 +6,67 @@ import base64
 from functools import lru_cache
 from io import BytesIO
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw
 
 from constants import *
+
+
+def paddle_fang_geometry(width=PADDLE_WIDTH):
+    """Return fixed-size fang triangles centered across the current paddle width."""
+    available_width = max(0, width - PADDLE_FANG_SIDE_INSET * 2)
+    fang_count = max(1, int(available_width / PADDLE_FANG_WIDTH))
+    occupied_width = fang_count * PADDLE_FANG_WIDTH
+    start_x = (width - occupied_width) / 2
+
+    return [
+        (
+            start_x + index * PADDLE_FANG_WIDTH,
+            start_x + (index + 1) * PADDLE_FANG_WIDTH,
+            start_x + (index + 0.5) * PADDLE_FANG_WIDTH,
+        )
+        for index in range(fang_count)
+    ]
+
+
+@lru_cache(maxsize=32)
+def _create_paddle_assets(width, height, corner_radius):
+    """Cache the expensive gradient, mask, and fixed-size fang layer per width."""
+    scale = 4
+    scaled_width = int(width * scale)
+    scaled_height = int(height * scale)
+
+    gradient_row = Image.new("RGBA", (width, 1))
+    gradient_row.putdata([
+        (*gradient_color(x / max(1, width - 1)), 255)
+        for x in range(width)
+    ])
+    gradient = gradient_row.resize((width, height))
+
+    mask = Image.new("L", (scaled_width, scaled_height), 0)
+    mask_draw = ImageDraw.Draw(mask)
+    mask_draw.rounded_rectangle(
+        [0, 0, scaled_width - 1, scaled_height - 1],
+        radius=corner_radius * scale,
+        fill=255,
+    )
+
+    fangs = Image.new("RGBA", (scaled_width, scaled_height), (0, 0, 0, 0))
+    fang_draw = ImageDraw.Draw(fangs)
+    fang_height = PADDLE_FANG_HEIGHT * scale
+    for base_left, base_right, tip_x in paddle_fang_geometry(width):
+        fang_draw.polygon(
+            [
+                (base_left * scale, 0),
+                (base_right * scale, 0),
+                (tip_x * scale, fang_height),
+            ],
+            fill=COLOR_PADDLE_FANG,
+            outline=COLOR_PADDLE_FANG_SHADOW,
+        )
+
+    mask = mask.resize((width, height), Image.Resampling.LANCZOS)
+    fangs = fangs.resize((width, height), Image.Resampling.LANCZOS)
+    return gradient, mask, fangs
 
 
 def create_paddle_image(
@@ -18,50 +76,15 @@ def create_paddle_image(
     gradient_offset=0,
 ):
     """创建一帧彩虹尖牙挡板图像 / Create one rainbow fang paddle image frame."""
-    scale = 4
-    scaled_width = int(width * scale)
-    scaled_height = int(height * scale)
+    width = int(width)
+    height = int(height)
+    gradient, mask, fangs = _create_paddle_assets(width, height, corner_radius)
+    shifted_gradient = ImageChops.offset(gradient, int(round(gradient_offset)), 0)
+    image = Image.new("RGBA", gradient.size, (0, 0, 0, 0))
+    image.paste(shifted_gradient, (0, 0), mask)
+    image.alpha_composite(fangs)
 
-    image = Image.new("RGBA", (scaled_width, scaled_height), (0, 0, 0, 0))
-    gradient = Image.new("RGBA", (scaled_width, scaled_height), (0, 0, 0, 0))
-    gradient_draw = ImageDraw.Draw(gradient)
-
-    for x in range(scaled_width):
-        gradient_x = (x / scale - gradient_offset) % width
-        color = gradient_color(gradient_x / max(1, width))
-        gradient_draw.line([(x, 0), (x, scaled_height)], fill=(*color, 255))
-
-    mask = Image.new("L", (scaled_width, scaled_height), 0)
-    mask_draw = ImageDraw.Draw(mask)
-    mask_draw.rounded_rectangle(
-        [0, 0, scaled_width - 1, scaled_height - 1],
-        radius=corner_radius * scale,
-        fill=255,
-    )
-    image.paste(gradient, (0, 0), mask)
-
-    draw = ImageDraw.Draw(image)
-    fang_height = PADDLE_FANG_HEIGHT * scale
-    fang_inset = PADDLE_FANG_SIDE_INSET * scale
-    usable_width = scaled_width - fang_inset * 2
-    fang_spacing = usable_width / PADDLE_FANG_COUNT
-
-    for index in range(PADDLE_FANG_COUNT):
-        base_left = fang_inset + index * fang_spacing
-        base_right = fang_inset + (index + 1) * fang_spacing
-        tip_x = (base_left + base_right) / 2
-
-        draw.polygon(
-            [
-                (base_left, 0),
-                (base_right, 0),
-                (tip_x, fang_height),
-            ],
-            fill=COLOR_PADDLE_FANG,
-            outline=COLOR_PADDLE_FANG_SHADOW,
-        )
-
-    return image.resize((int(width), int(height)), Image.Resampling.LANCZOS)
+    return image
 
 
 def gradient_color(position):
@@ -99,6 +122,7 @@ def create_paddle_sprite_sheet_data_url(
         sheet.paste(frame, (int(width * frame_index), 0))
 
     output = BytesIO()
-    sheet.save(output, format="PNG")
+    # Fast compression keeps width changes within a frame budget; the data URL is cached.
+    sheet.save(output, format="PNG", compress_level=1)
     encoded = base64.b64encode(output.getvalue()).decode("ascii")
     return f"data:image/png;base64,{encoded}"

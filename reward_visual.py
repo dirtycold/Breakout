@@ -21,9 +21,11 @@ class RewardMotion:
     angular_velocity: float
 
 
-def should_spawn_reward(rng=random):
-    """Return whether a destroyed brick drops a reward."""
-    return rng.random() < REWARD_TRIGGER_PROBABILITY
+def choose_reward_type(rng=random):
+    """Roll the shared drop chance, then choose each reward type uniformly."""
+    if rng.random() >= REWARD_TRIGGER_PROBABILITY:
+        return None
+    return rng.choice(REWARD_TYPES)
 
 
 def create_reward_motion(source_dx=0, rng=random):
@@ -44,9 +46,7 @@ def create_reward_motion(source_dx=0, rng=random):
     )
 
 
-@lru_cache(maxsize=4)
-def create_fireball_reward_image(size=REWARD_SIZE):
-    """Draw a rounded reward block containing a fireball icon."""
+def _create_reward_canvas(size, background, border):
     scale = REWARD_TEXTURE_SUPERSAMPLE
     side = int(size * scale)
     radius = REWARD_CORNER_RADIUS * scale
@@ -56,9 +56,20 @@ def create_fireball_reward_image(size=REWARD_SIZE):
     draw.rounded_rectangle(
         (1 * scale, 1 * scale, side - 1 * scale - 1, side - 1 * scale - 1),
         radius=radius,
-        fill=(77, 18, 35, 246),
-        outline=(251, 146, 60, 255),
+        fill=background,
+        outline=border,
         width=2 * scale,
+    )
+    return image, draw, scale
+
+
+@lru_cache(maxsize=4)
+def create_fireball_reward_image(size=REWARD_SIZE):
+    """Draw a green-hinted reward block containing a fireball icon."""
+    image, draw, scale = _create_reward_canvas(
+        size,
+        background=(*REWARD_FIREBALL_COLOR, 246),
+        border=(*REWARD_FIREBALL_BORDER_COLOR, 255),
     )
 
     # A diagonal flame with a round, bright fireball at its leading edge.
@@ -100,10 +111,57 @@ def create_fireball_reward_image(size=REWARD_SIZE):
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
-@lru_cache(maxsize=4)
-def create_fireball_reward_data_url(size=REWARD_SIZE):
-    """Return the generated reward artwork as an embeddable PNG URL."""
+@lru_cache(maxsize=8)
+def create_paddle_size_reward_image(reward_type, size=REWARD_SIZE):
+    """Draw prominent colored direction triangles on a neutral block."""
+    if reward_type not in (REWARD_TYPE_EXTEND_PADDLE, REWARD_TYPE_SHRINK_PADDLE):
+        raise ValueError(f"Unsupported paddle reward type: {reward_type}")
+
+    image, draw, scale = _create_reward_canvas(
+        size,
+        background=(*REWARD_NEUTRAL_COLOR, 246),
+        border=(*REWARD_NEUTRAL_BORDER_COLOR, 255),
+    )
+    if reward_type == REWARD_TYPE_EXTEND_PADDLE:
+        accent = (59, 130, 246, 255)
+        draw.polygon(
+            ((4 * scale, 19 * scale), (16 * scale, 8 * scale), (16 * scale, 30 * scale)),
+            fill=accent,
+        )
+        draw.polygon(
+            ((34 * scale, 19 * scale), (22 * scale, 8 * scale), (22 * scale, 30 * scale)),
+            fill=accent,
+        )
+    else:
+        accent = (239, 68, 68, 255)
+        draw.polygon(
+            ((17 * scale, 19 * scale), (5 * scale, 8 * scale), (5 * scale, 30 * scale)),
+            fill=accent,
+        )
+        draw.polygon(
+            ((21 * scale, 19 * scale), (33 * scale, 8 * scale), (33 * scale, 30 * scale)),
+            fill=accent,
+        )
+
+    return image.resize((size, size), Image.Resampling.LANCZOS)
+
+
+@lru_cache(maxsize=12)
+def create_reward_image(reward_type, size=REWARD_SIZE):
+    if reward_type == REWARD_TYPE_FIREBALL:
+        return create_fireball_reward_image(size)
+    return create_paddle_size_reward_image(reward_type, size)
+
+
+@lru_cache(maxsize=12)
+def create_reward_data_url(reward_type, size=REWARD_SIZE):
+    """Return generated reward artwork as an embeddable PNG URL."""
     output = BytesIO()
-    create_fireball_reward_image(size).save(output, format="PNG")
+    create_reward_image(reward_type, size).save(output, format="PNG")
     encoded = base64.b64encode(output.getvalue()).decode("ascii")
     return f"data:image/png;base64,{encoded}"
+
+
+def create_fireball_reward_data_url(size=REWARD_SIZE):
+    """Compatibility wrapper for the fireball reward texture."""
+    return create_reward_data_url(REWARD_TYPE_FIREBALL, size)
