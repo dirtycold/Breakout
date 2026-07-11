@@ -25,18 +25,17 @@ from qtpy.QtCore import (
 
 from ball_texture import RainbowBallMotion, create_rainbow_ball_data_url
 from constants import *
+from fireball_effect import inside_fireball_impact_area
+from reward_visual import (
+    create_fireball_reward_data_url,
+    create_reward_motion,
+    should_spawn_reward,
+)
 
 # 导出颜色列表供 QML 使用
 def getBrickColors():
     """获取砖块颜色列表（HEX 格式）/ Get Brick Colors (HEX format)"""
     return BRICK_COLORS_HEX
-
-
-def reward_initial_speed_x(source_dx):
-    """根据小球水平运动方向返回奖励水平初速度 / Reward x velocity from ball x direction."""
-    if abs(source_dx) < 1e-6:
-        return 0
-    return math.copysign(REWARD_INITIAL_SPEED_X, source_dx)
 
 
 class BrickModel(QAbstractListModel):
@@ -307,26 +306,23 @@ class RewardModel(QAbstractListModel):
     REWARD_X_ROLE = int(Qt.ItemDataRole.UserRole) + 1
     REWARD_Y_ROLE = REWARD_X_ROLE + 1
     REWARD_SIZE_ROLE = REWARD_X_ROLE + 2
-    REWARD_COLOR_ROLE = REWARD_X_ROLE + 3
-    REWARD_BORDER_COLOR_ROLE = REWARD_X_ROLE + 4
-    REWARD_SYMBOL_ROLE = REWARD_X_ROLE + 5
+    REWARD_TEXTURE_ROLE = REWARD_X_ROLE + 3
+    REWARD_ROTATION_ROLE = REWARD_X_ROLE + 4
 
     ROLE_NAMES = {
         REWARD_X_ROLE: b"rewardX",
         REWARD_Y_ROLE: b"rewardY",
         REWARD_SIZE_ROLE: b"rewardSize",
-        REWARD_COLOR_ROLE: b"rewardColor",
-        REWARD_BORDER_COLOR_ROLE: b"rewardBorderColor",
-        REWARD_SYMBOL_ROLE: b"rewardSymbol",
+        REWARD_TEXTURE_ROLE: b"rewardTexture",
+        REWARD_ROTATION_ROLE: b"rewardRotation",
     }
 
     ROLE_KEYS = {
         REWARD_X_ROLE: "x",
         REWARD_Y_ROLE: "y",
         REWARD_SIZE_ROLE: "size",
-        REWARD_COLOR_ROLE: "color",
-        REWARD_BORDER_COLOR_ROLE: "borderColor",
-        REWARD_SYMBOL_ROLE: "symbol",
+        REWARD_TEXTURE_ROLE: "texture",
+        REWARD_ROTATION_ROLE: "rotation",
     }
 
     def __init__(self, parent=None):
@@ -364,18 +360,20 @@ class RewardModel(QAbstractListModel):
 
     def create_fireball_reward(self, center_x, center_y, source_dx=0):
         """创建火球奖励 / Create a fireball reward."""
+        motion = create_reward_motion(source_dx)
         row = len(self._rewards)
         self.beginInsertRows(QModelIndex(), row, row)
         self._rewards.append({
             "type": REWARD_TYPE_FIREBALL,
             "x": center_x - REWARD_RADIUS,
             "y": center_y - REWARD_RADIUS,
-            "vx": reward_initial_speed_x(source_dx),
-            "vy": -REWARD_INITIAL_SPEED_Y,
+            "vx": motion.vx,
+            "vy": -motion.upward_speed,
+            "gravity": motion.gravity,
+            "rotation": motion.angle,
+            "angularVelocity": motion.angular_velocity,
             "size": REWARD_SIZE,
-            "color": REWARD_FIREBALL_COLOR_HEX,
-            "borderColor": REWARD_FIREBALL_BORDER_COLOR_HEX,
-            "symbol": REWARD_FIREBALL_SYMBOL,
+            "texture": create_fireball_reward_data_url(),
         })
         self.endInsertRows()
 
@@ -389,7 +387,10 @@ class RewardModel(QAbstractListModel):
             reward = self._rewards[row]
             reward["x"] += reward["vx"] * delta_time
             reward["y"] += reward["vy"] * delta_time
-            reward["vy"] += REWARD_GRAVITY * delta_time
+            reward["vy"] += reward["gravity"] * delta_time
+            reward["rotation"] = (
+                reward["rotation"] + reward["angularVelocity"] * delta_time
+            ) % 360
 
             if reward["x"] <= 0:
                 reward["x"] = 0
@@ -410,6 +411,7 @@ class RewardModel(QAbstractListModel):
             self.dataChanged.emit(top_left, bottom_right, [
                 self.REWARD_X_ROLE,
                 self.REWARD_Y_ROLE,
+                self.REWARD_ROTATION_ROLE,
             ])
 
         return collected_types
@@ -782,7 +784,7 @@ class GameController(QObject):
             self._state.brickCount -= 1
 
             self._particle_model.create_explosion(center_x, center_y, brick["color"])
-            if random.random() <= REWARD_TRIGGER_PROBABILITY:
+            if should_spawn_reward():
                 self._reward_model.create_fireball_reward(center_x, center_y, direction_x)
 
         if self._state.brickCount <= 0:

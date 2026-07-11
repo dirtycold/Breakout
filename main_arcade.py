@@ -77,7 +77,13 @@ _patch_pyglet_fontconfig_memory_faces()
 from PIL import Image, ImageDraw
 from ball_texture import RainbowBallMotion, create_rainbow_ball_image
 from constants import *
+from fireball_effect import inside_fireball_impact_area
 from paddle_texture import create_paddle_image
+from reward_visual import (
+    create_fireball_reward_image,
+    create_reward_motion,
+    should_spawn_reward,
+)
 
 
 class RainbowBall(arcade.Sprite):
@@ -113,26 +119,26 @@ class RainbowBall(arcade.Sprite):
         self.fireball_active = True
 
 
-class RewardSprite(arcade.SpriteCircle):
+class RewardSprite(arcade.Sprite):
     """自由落体奖励物件 / Free-falling reward object."""
 
     def __init__(self, reward_type, center_x, center_y, source_dx=0):
-        super().__init__(
-            int(REWARD_RADIUS),
-            REWARD_FIREBALL_COLOR,
+        super().__init__()
+        self.texture = arcade.Texture(
+            image=create_fireball_reward_image(),
+            name=f"fireball_reward_{id(self)}",
         )
+        self.width = REWARD_SIZE
+        self.height = REWARD_SIZE
         self.reward_type = reward_type
         self.center_x = center_x
         self.center_y = center_y
-        self.change_x = reward_initial_speed_x(source_dx)
-        self.change_y = REWARD_INITIAL_SPEED_Y
-
-
-def reward_initial_speed_x(source_dx):
-    """根据小球水平运动方向返回奖励水平初速度 / Reward x velocity from ball x direction."""
-    if abs(source_dx) < 1e-6:
-        return 0
-    return math.copysign(REWARD_INITIAL_SPEED_X, source_dx)
+        motion = create_reward_motion(source_dx)
+        self.change_x = motion.vx
+        self.change_y = motion.upward_speed
+        self.gravity = motion.gravity
+        self.angle = motion.angle
+        self.angular_velocity = motion.angular_velocity
 
 
 class RoundedRectBrick(arcade.Sprite):
@@ -337,18 +343,6 @@ class BreakoutGame(arcade.Window):
 
         # 绘制奖励物件 / Draw rewards
         self.reward_list.draw()
-        for reward in self.reward_list:
-            arcade.draw_text(
-                REWARD_FIREBALL_SYMBOL,
-                reward.center_x,
-                reward.center_y - REWARD_RADIUS / 2,
-                arcade.color.WHITE,
-                int(REWARD_SIZE * 0.7),
-                font_name=GAME_FONT_FAMILIES,
-                anchor_x="center",
-                anchor_y="center",
-                bold=True,
-            )
 
         # 绘制球 / Draw ball
         self.ball_list.draw()
@@ -566,7 +560,7 @@ class BreakoutGame(arcade.Window):
 
     def spawn_reward(self, x, y, source_dx=0):
         """按概率生成奖励 / Spawn a reward by configured probability."""
-        if random.random() > REWARD_TRIGGER_PROBABILITY:
+        if not should_spawn_reward():
             return
 
         reward = RewardSprite(REWARD_TYPE_FIREBALL, x, y, source_dx)
@@ -580,7 +574,8 @@ class BreakoutGame(arcade.Window):
         for reward in self.reward_list:
             reward.center_x += reward.change_x * delta_time
             reward.center_y += reward.change_y * delta_time
-            reward.change_y -= REWARD_GRAVITY * delta_time
+            reward.change_y -= reward.gravity * delta_time
+            reward.angle = (reward.angle + reward.angular_velocity * delta_time) % 360
 
             if reward.center_x - REWARD_RADIUS <= 0:
                 reward.center_x = REWARD_RADIUS

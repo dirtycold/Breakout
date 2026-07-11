@@ -110,22 +110,13 @@ Window {
                     y: model.rewardY
                     width: model.rewardSize
                     height: model.rewardSize
+                    rotation: model.rewardRotation
 
-                    Rectangle {
+                    Image {
                         anchors.fill: parent
-                        radius: width / 2
-                        color: model.rewardColor
-                        border.color: model.rewardBorderColor
-                        border.width: 2
-                    }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: model.rewardSymbol
-                        color: "white"
-                        font.pixelSize: parent.width * 0.62
-                        font.family: config.gameFontFamily
-                        font.bold: true
+                        source: model.rewardTexture
+                        smooth: true
+                        mipmap: true
                     }
                 }
             }
