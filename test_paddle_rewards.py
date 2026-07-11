@@ -14,6 +14,7 @@ from constants import (
     REWARD_TYPE_SHRINK_PADDLE,
 )
 from game_logic_qml import GameController
+from main_arcade import RoundedRectPaddle
 from paddle_texture import paddle_fang_geometry
 
 
@@ -57,6 +58,18 @@ class PaddleRewardTests(unittest.TestCase):
                 for base_left, base_right, tip_x in fangs:
                     self.assertAlmostEqual(base_right - base_left, PADDLE_FANG_WIDTH)
                     self.assertAlmostEqual(tip_x, (base_left + base_right) / 2)
+
+    def test_arcade_hit_box_tracks_the_resized_texture(self):
+        paddle = RoundedRectPaddle(PADDLE_WIDTH, 20, (52, 152, 219))
+        paddle.center_x = 400
+        paddle.center_y = 50
+
+        for paddle_width in (130, 70, PADDLE_MAX_WIDTH, PADDLE_MIN_WIDTH):
+            with self.subTest(paddle_width=paddle_width):
+                paddle.set_paddle_width(paddle_width)
+                points = paddle.hit_box.get_adjusted_points()
+                hit_box_width = max(point[0] for point in points) - min(point[0] for point in points)
+                self.assertAlmostEqual(hit_box_width, paddle.width)
 
 if __name__ == "__main__":
     unittest.main()

@@ -261,6 +261,7 @@ class RoundedRectPaddle(arcade.Sprite):
         self.texture = self._texture_frames[self._frame_index]
         self.width = self.paddle_width
         self.height = self.paddle_height
+        self.sync_hit_box_to_texture()
 
 
 class BreakoutGame(arcade.Window):
