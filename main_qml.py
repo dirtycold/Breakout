@@ -275,6 +275,26 @@ class GameConfigProvider(QObject):
     def particleLifetime(self):
         return PARTICLE_LIFETIME
 
+    @Property(int, constant=True)
+    def laserGunWidth(self):
+        return LASER_GUN_WIDTH
+
+    @Property(int, constant=True)
+    def laserGunHeight(self):
+        return LASER_GUN_HEIGHT
+
+    @Property(int, constant=True)
+    def laserGunSideInset(self):
+        return LASER_GUN_SIDE_INSET
+
+    @Property(str, constant=True)
+    def laserGunColor(self):
+        return LASER_GUN_COLOR_HEX
+
+    @Property(str, constant=True)
+    def laserBulletColor(self):
+        return LASER_BULLET_COLOR_HEX
+
     @Slot(int, result=int)
     def bricksInRow(self, row):
         return bricks_in_row(row)

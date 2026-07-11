@@ -12,9 +12,11 @@ from constants import (
     REWARD_SIZE,
     REWARD_TRIGGER_PROBABILITY,
     REWARD_TYPES,
+    REWARD_WEIGHTS,
     REWARD_TYPE_EXTEND_PADDLE,
     REWARD_TYPE_FIREBALL,
     REWARD_TYPE_SHRINK_PADDLE,
+    REWARD_TYPE_SKULL,
 )
 from reward_visual import (
     choose_reward_type,
@@ -22,6 +24,7 @@ from reward_visual import (
     create_fireball_reward_image,
     create_paddle_size_reward_image,
     create_reward_data_url,
+    create_reward_image,
     create_reward_motion,
 )
 
@@ -35,12 +38,17 @@ class StubRandom:
         return self.value
 
     def choice(self, values):
-        assert tuple(values) == REWARD_TYPES
         return self.choice_value
+
+    def choices(self, values, weights, k):
+        assert tuple(values) == REWARD_TYPES
+        assert tuple(weights) == REWARD_WEIGHTS
+        assert k == 1
+        return [self.choice_value]
 
 
 class RewardVisualTests(unittest.TestCase):
-    def test_drop_roll_uses_shared_probability_then_uniform_type_pool(self):
+    def test_drop_roll_uses_shared_probability_then_weighted_type_pool(self):
         self.assertEqual(REWARD_TRIGGER_PROBABILITY, 0.5)
         self.assertIsNone(choose_reward_type(StubRandom(REWARD_TRIGGER_PROBABILITY)))
         for reward_type in REWARD_TYPES:
@@ -48,6 +56,10 @@ class RewardVisualTests(unittest.TestCase):
                 choose_reward_type(StubRandom(0.0, reward_type)),
                 reward_type,
             )
+        skull_weight = REWARD_WEIGHTS[REWARD_TYPES.index(REWARD_TYPE_SKULL)]
+        for reward_type, weight in zip(REWARD_TYPES, REWARD_WEIGHTS):
+            if reward_type != REWARD_TYPE_SKULL:
+                self.assertEqual(weight, skull_weight * 2)
 
     def test_motion_is_varied_and_stays_in_configured_ranges(self):
         motions = [create_reward_motion(200, random.Random(seed)) for seed in range(12)]
@@ -92,6 +104,8 @@ class RewardVisualTests(unittest.TestCase):
         self.assertTrue(
             create_reward_data_url(REWARD_TYPE_SHRINK_PADDLE).startswith("data:image/png;base64,")
         )
+        for reward_type in REWARD_TYPES:
+            self.assertEqual(create_reward_image(reward_type).size, (REWARD_SIZE, REWARD_SIZE))
 
 
 if __name__ == "__main__":

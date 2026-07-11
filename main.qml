@@ -79,6 +79,7 @@ Window {
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
+            acceptedButtons: Qt.LeftButton
             onPositionChanged: function(mouse) {
                 var nextX = Math.max(
                     0,
@@ -87,6 +88,10 @@ Window {
                 // Update the visible paddle before crossing the QML/Python boundary.
                 root.paddleVisualX = nextX
                 gameController.setPaddleX(nextX)
+            }
+            onPressed: function(mouse) {
+                gameController.fireLaser()
+                mouse.accepted = true
             }
         }
 
@@ -138,6 +143,24 @@ Window {
         }
 
         // 挡板
+        Item {
+            id: laserBulletContainer
+            anchors.fill: parent
+
+            Repeater {
+                model: gameController.laserModel
+
+                delegate: Rectangle {
+                    x: model.bulletX
+                    y: model.bulletY
+                    width: model.bulletWidth
+                    height: model.bulletHeight
+                    radius: width / 2
+                    color: config.laserBulletColor
+                }
+            }
+        }
+
         Rectangle {
             id: paddle
             width: gameController.paddleWidth
@@ -167,6 +190,26 @@ Window {
                     cache: true
                     asynchronous: false
                 }
+            }
+
+            Rectangle {
+                visible: gameController.laserActive
+                width: config.laserGunWidth
+                height: config.laserGunHeight
+                radius: width / 2
+                color: config.laserGunColor
+                x: config.laserGunSideInset
+                y: -height + 3
+            }
+
+            Rectangle {
+                visible: gameController.laserActive
+                width: config.laserGunWidth
+                height: config.laserGunHeight
+                radius: width / 2
+                color: config.laserGunColor
+                x: paddle.width - config.laserGunSideInset - width
+                y: -height + 3
             }
 
             // 键盘移动逻辑

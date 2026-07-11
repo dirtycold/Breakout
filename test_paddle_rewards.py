@@ -11,7 +11,12 @@ from constants import (
     BALL_DIAMETER,
     SCREEN_WIDTH,
     REWARD_TYPE_EXTEND_PADDLE,
+    REWARD_TYPE_FIREBALL,
+    REWARD_TYPE_LASER,
+    REWARD_TYPE_RESET,
     REWARD_TYPE_SHRINK_PADDLE,
+    REWARD_TYPE_SKULL,
+    GameStatus,
 )
 from game_logic_qml import GameController
 from main_arcade import RoundedRectPaddle
@@ -70,6 +75,25 @@ class PaddleRewardTests(unittest.TestCase):
                 points = paddle.hit_box.get_adjusted_points()
                 hit_box_width = max(point[0] for point in points) - min(point[0] for point in points)
                 self.assertAlmostEqual(hit_box_width, paddle.width)
+
+    def test_reset_reward_clears_all_persistent_effects(self):
+        self.controller.state.gameStatus = GameStatus.PLAYING
+        self.controller._apply_reward(REWARD_TYPE_FIREBALL)
+        self.controller._apply_reward(REWARD_TYPE_EXTEND_PADDLE)
+        self.controller._apply_reward(REWARD_TYPE_LASER)
+        self.controller.fireLaser()
+        self.assertEqual(len(self.controller.laserModel._bullets), 2)
+
+        self.controller._apply_reward(REWARD_TYPE_RESET)
+        self.assertFalse(self.controller.ball.fireball_active)
+        self.assertFalse(self.controller.laserActive)
+        self.assertEqual(self.controller.paddleWidth, PADDLE_WIDTH)
+        self.assertEqual(len(self.controller.laserModel._bullets), 0)
+
+    def test_skull_reward_ends_the_game_immediately(self):
+        self.controller.state.gameStatus = GameStatus.PLAYING
+        self.controller._apply_reward(REWARD_TYPE_SKULL)
+        self.assertEqual(self.controller.state.gameStatus, GameStatus.GAME_OVER)
 
 if __name__ == "__main__":
     unittest.main()

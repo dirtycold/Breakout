@@ -434,6 +434,84 @@ class RewardModel(QAbstractListModel):
         self.endRemoveRows()
 
 
+class LaserModel(QAbstractListModel):
+    """激光子弹模型 / Laser bullet model."""
+
+    BULLET_X_ROLE = int(Qt.ItemDataRole.UserRole) + 1
+    BULLET_Y_ROLE = BULLET_X_ROLE + 1
+    BULLET_WIDTH_ROLE = BULLET_X_ROLE + 2
+    BULLET_HEIGHT_ROLE = BULLET_X_ROLE + 3
+
+    ROLE_NAMES = {
+        BULLET_X_ROLE: b"bulletX",
+        BULLET_Y_ROLE: b"bulletY",
+        BULLET_WIDTH_ROLE: b"bulletWidth",
+        BULLET_HEIGHT_ROLE: b"bulletHeight",
+    }
+    ROLE_KEYS = {
+        BULLET_X_ROLE: "x",
+        BULLET_Y_ROLE: "y",
+        BULLET_WIDTH_ROLE: "width",
+        BULLET_HEIGHT_ROLE: "height",
+    }
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._bullets = []
+
+    def rowCount(self, parent=QModelIndex()):
+        return 0 if parent.isValid() else len(self._bullets)
+
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if not index.isValid() or not 0 <= index.row() < len(self._bullets):
+            return None
+        key = self.ROLE_KEYS.get(int(role))
+        return self._bullets[index.row()].get(key) if key else None
+
+    def roleNames(self):
+        return {role: QByteArray(name) for role, name in self.ROLE_NAMES.items()}
+
+    def clear(self):
+        if not self._bullets:
+            return
+        self.beginResetModel()
+        self._bullets = []
+        self.endResetModel()
+
+    def fire(self, paddle_x, paddle_y, paddle_width):
+        """从挡板两侧各发射一枚子弹 / Fire one bullet from each paddle gun."""
+        centers = (
+            paddle_x + LASER_GUN_SIDE_INSET + LASER_GUN_WIDTH / 2,
+            paddle_x + paddle_width - LASER_GUN_SIDE_INSET - LASER_GUN_WIDTH / 2,
+        )
+        start_row = len(self._bullets)
+        self.beginInsertRows(QModelIndex(), start_row, start_row + 1)
+        for center_x in centers:
+            self._bullets.append({
+                "x": center_x - LASER_BULLET_WIDTH / 2,
+                "y": paddle_y - LASER_BULLET_HEIGHT,
+                "width": LASER_BULLET_WIDTH,
+                "height": LASER_BULLET_HEIGHT,
+            })
+        self.endInsertRows()
+
+    def update_bullets(self, delta_time):
+        for bullet in self._bullets:
+            bullet["y"] -= LASER_BULLET_SPEED * delta_time
+
+        if self._bullets:
+            self.dataChanged.emit(
+                self.index(0, 0),
+                self.index(len(self._bullets) - 1, 0),
+                [self.BULLET_Y_ROLE],
+            )
+
+    def remove_bullet(self, row):
+        self.beginRemoveRows(QModelIndex(), row, row)
+        self._bullets.pop(row)
+        self.endRemoveRows()
+
+
 class GameState(QObject):
     """游戏状态管理 / Game State Management"""
 
@@ -608,6 +686,10 @@ class Ball(QObject):
         """激活火球效果 / Activate fireball effect."""
         self._fireball_active = True
 
+    def deactivate_fireball(self):
+        """清除火球效果 / Clear fireball effect."""
+        self._fireball_active = False
+
     @property
     def fireball_active(self):
         return self._fireball_active
@@ -626,6 +708,7 @@ class GameController(QObject):
 
     paddleXChanged = Signal(float)
     paddleWidthChanged = Signal(float)
+    laserActiveChanged = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -634,11 +717,13 @@ class GameController(QObject):
         self._brick_model = BrickModel(self)
         self._particle_model = ParticleModel(self)
         self._reward_model = RewardModel(self)
+        self._laser_model = LaserModel(self)
         self._paddle_x = (SCREEN_WIDTH - PADDLE_WIDTH) / 2
         self._paddle_y = qml_paddle_y()
         self._paddle_width = PADDLE_WIDTH
         self._paddle_move_left = False
         self._paddle_move_right = False
+        self._laser_active = False
 
         self._state.brickCount = total_brick_count()
 
@@ -693,6 +778,14 @@ class GameController(QObject):
         """奖励物件模型"""
         return self._reward_model
 
+    @Property(QObject, constant=True)
+    def laserModel(self):
+        return self._laser_model
+
+    @Property(bool, notify=laserActiveChanged)
+    def laserActive(self):
+        return self._laser_active
+
     @Slot()
     def startGame(self):
         """开始游戏 / Start Game"""
@@ -714,6 +807,8 @@ class GameController(QObject):
         self._brick_model.reset_bricks()
         self._particle_model.clear()
         self._reward_model.clear()
+        self._laser_model.clear()
+        self._set_laser_active(False)
         self._state.score = 0
         self._state.gameStatus = GameStatus.NOT_STARTED
         self._state.message = MESSAGE_START
@@ -777,6 +872,33 @@ class GameController(QObject):
             self._set_paddle_width(self._paddle_width + PADDLE_REWARD_SIZE_STEP)
         elif reward_type == REWARD_TYPE_SHRINK_PADDLE:
             self._set_paddle_width(self._paddle_width - PADDLE_REWARD_SIZE_STEP)
+        elif reward_type == REWARD_TYPE_RESET:
+            self._reset_active_rewards()
+        elif reward_type == REWARD_TYPE_LASER:
+            self._set_laser_active(True)
+        elif reward_type == REWARD_TYPE_SKULL:
+            self._state.gameStatus = GameStatus.GAME_OVER
+            self._state.message = MESSAGE_GAME_OVER
+            self._set_laser_active(False)
+
+    def _set_laser_active(self, active):
+        if self._laser_active == active:
+            return
+        self._laser_active = active
+        self.laserActiveChanged.emit(active)
+        if not active:
+            self._laser_model.clear()
+
+    def _reset_active_rewards(self):
+        """清除所有已接取并持续生效的奖励 / Reset all active collected rewards."""
+        self._ball.deactivate_fireball()
+        self._set_laser_active(False)
+        self._set_paddle_width(PADDLE_WIDTH)
+
+    @Slot()
+    def fireLaser(self):
+        if self._laser_active and self._state.gameStatus == GameStatus.PLAYING:
+            self._laser_model.fire(self._paddle_x, self._paddle_y, self._paddle_width)
 
     def _update_paddle(self, delta_time):
         """按当前方向状态更新挡板 / Update paddle from current direction state."""
@@ -804,6 +926,42 @@ class GameController(QObject):
                 return True
 
         return False
+
+    def _update_lasers(self, delta_time):
+        """推进子弹并消除首个命中的砖块 / Advance bullets and destroy first hits."""
+        self._laser_model.update_bullets(delta_time)
+        for bullet_row in range(len(self._laser_model._bullets) - 1, -1, -1):
+            bullet = self._laser_model._bullets[bullet_row]
+            hit_row = None
+            for brick_row, brick in self._brick_model.active_brick_rows():
+                if (
+                    bullet["x"] + bullet["width"] >= brick["x"]
+                    and bullet["x"] <= brick["x"] + brick["width"]
+                    and bullet["y"] + bullet["height"] >= brick["y"]
+                    and bullet["y"] <= brick["y"] + brick["height"]
+                ):
+                    hit_row = brick_row
+                    break
+
+            if hit_row is not None:
+                self._destroy_laser_brick(hit_row)
+                self._laser_model.remove_bullet(bullet_row)
+            elif bullet["y"] + bullet["height"] < 0:
+                self._laser_model.remove_bullet(bullet_row)
+
+    def _destroy_laser_brick(self, row):
+        brick = self._brick_model.brick_at(row)
+        if brick["destroyed"]:
+            return
+        center_x = brick["x"] + brick["width"] / 2
+        center_y = brick["y"] + brick["height"] / 2
+        self._brick_model.destroy_brick(row)
+        self._state.score += SCORE_PER_BRICK
+        self._state.brickCount -= 1
+        self._particle_model.create_explosion(center_x, center_y, brick["color"])
+        if self._state.brickCount <= 0:
+            self._state.gameStatus = GameStatus.VICTORY
+            self._state.message = MESSAGE_VICTORY
 
     def _destroy_brick_group(self, hit_row, direction_x=0, direction_y=0):
         """销毁命中砖块，火球状态下沿运动方向额外销毁砖块 / Destroy fireball path."""
@@ -884,6 +1042,14 @@ class GameController(QObject):
                 self._paddle_width,
             ):
                 self._apply_reward(reward_type)
+                if self._state.gameStatus != GameStatus.PLAYING:
+                    break
+
+            if self._state.gameStatus != GameStatus.PLAYING:
+                self._particle_model.update_particles(FIXED_DELTA_TIME)
+                return
+
+            self._update_lasers(FIXED_DELTA_TIME)
 
             self._ball.update(FIXED_DELTA_TIME)  # 约 60 FPS
             self._ball.checkPaddleCollision(

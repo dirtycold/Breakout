@@ -22,10 +22,10 @@ class RewardMotion:
 
 
 def choose_reward_type(rng=random):
-    """Roll the shared drop chance, then choose each reward type uniformly."""
+    """Roll the shared drop chance, then choose from the weighted reward pool."""
     if rng.random() >= REWARD_TRIGGER_PROBABILITY:
         return None
-    return rng.choice(REWARD_TYPES)
+    return rng.choices(REWARD_TYPES, weights=REWARD_WEIGHTS, k=1)[0]
 
 
 def create_reward_motion(source_dx=0, rng=random):
@@ -146,11 +146,89 @@ def create_paddle_size_reward_image(reward_type, size=REWARD_SIZE):
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
+@lru_cache(maxsize=4)
+def create_reset_reward_image(size=REWARD_SIZE):
+    """Draw a neutral circular reset arrow."""
+    image, draw, scale = _create_reward_canvas(
+        size,
+        background=(*REWARD_NEUTRAL_COLOR, 246),
+        border=(*REWARD_NEUTRAL_BORDER_COLOR, 255),
+    )
+    accent = (226, 232, 240, 255)
+    draw.arc(
+        (8 * scale, 8 * scale, 30 * scale, 30 * scale),
+        start=35,
+        end=325,
+        fill=accent,
+        width=4 * scale,
+    )
+    draw.polygon(
+        ((27 * scale, 5 * scale), (34 * scale, 9 * scale), (27 * scale, 14 * scale)),
+        fill=accent,
+    )
+    return image.resize((size, size), Image.Resampling.LANCZOS)
+
+
+@lru_cache(maxsize=4)
+def create_laser_reward_image(size=REWARD_SIZE):
+    """Draw twin laser barrels and bright beams on a positive hint."""
+    image, draw, scale = _create_reward_canvas(
+        size,
+        background=(*REWARD_FIREBALL_COLOR, 246),
+        border=(*REWARD_FIREBALL_BORDER_COLOR, 255),
+    )
+    metal = (226, 232, 240, 255)
+    beam = (*LASER_BULLET_COLOR, 255)
+    for center_x in (12, 26):
+        draw.rounded_rectangle(
+            ((center_x - 4) * scale, 19 * scale, (center_x + 4) * scale, 31 * scale),
+            radius=2 * scale,
+            fill=metal,
+        )
+        draw.rounded_rectangle(
+            ((center_x - 1.5) * scale, 6 * scale, (center_x + 1.5) * scale, 22 * scale),
+            radius=1 * scale,
+            fill=beam,
+        )
+    return image.resize((size, size), Image.Resampling.LANCZOS)
+
+
+@lru_cache(maxsize=4)
+def create_skull_reward_image(size=REWARD_SIZE):
+    """Draw a compact white skull on a negative red hint."""
+    image, draw, scale = _create_reward_canvas(
+        size,
+        background=(*REWARD_NEGATIVE_COLOR, 246),
+        border=(*REWARD_NEGATIVE_BORDER_COLOR, 255),
+    )
+    bone = (248, 250, 252, 255)
+    shadow = (71, 85, 105, 255)
+    draw.ellipse((8 * scale, 6 * scale, 30 * scale, 28 * scale), fill=bone)
+    draw.rectangle((12 * scale, 22 * scale, 26 * scale, 32 * scale), fill=bone)
+    draw.ellipse((12 * scale, 13 * scale, 18 * scale, 20 * scale), fill=shadow)
+    draw.ellipse((20 * scale, 13 * scale, 26 * scale, 20 * scale), fill=shadow)
+    draw.polygon(
+        ((19 * scale, 19 * scale), (16.5 * scale, 24 * scale), (21.5 * scale, 24 * scale)),
+        fill=shadow,
+    )
+    for x in (15, 19, 23):
+        draw.line((x * scale, 26 * scale, x * scale, 32 * scale), fill=shadow, width=1 * scale)
+    return image.resize((size, size), Image.Resampling.LANCZOS)
+
+
 @lru_cache(maxsize=12)
 def create_reward_image(reward_type, size=REWARD_SIZE):
     if reward_type == REWARD_TYPE_FIREBALL:
         return create_fireball_reward_image(size)
-    return create_paddle_size_reward_image(reward_type, size)
+    if reward_type in (REWARD_TYPE_EXTEND_PADDLE, REWARD_TYPE_SHRINK_PADDLE):
+        return create_paddle_size_reward_image(reward_type, size)
+    if reward_type == REWARD_TYPE_RESET:
+        return create_reset_reward_image(size)
+    if reward_type == REWARD_TYPE_LASER:
+        return create_laser_reward_image(size)
+    if reward_type == REWARD_TYPE_SKULL:
+        return create_skull_reward_image(size)
+    raise ValueError(f"Unsupported reward type: {reward_type}")
 
 
 @lru_cache(maxsize=12)

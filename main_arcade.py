@@ -118,6 +118,10 @@ class RainbowBall(arcade.Sprite):
         """激活火球效果 / Activate fireball effect."""
         self.fireball_active = True
 
+    def deactivate_fireball(self):
+        """清除火球效果 / Clear fireball effect."""
+        self.fireball_active = False
+
 
 class RewardSprite(arcade.Sprite):
     """自由落体奖励物件 / Free-falling reward object."""
@@ -282,6 +286,9 @@ class BreakoutGame(arcade.Window):
         self.brick_list = None
         self.particle_list = None
         self.reward_list = None
+        self.laser_bullet_list = None
+        self.laser_gun_list = None
+        self.laser_active = False
 
         # 移动标志 / Movement flags
         self.left_pressed = False
@@ -337,6 +344,16 @@ class BreakoutGame(arcade.Window):
         # 重置粒子效果 / Reset particle effects
         self.particle_list = arcade.SpriteList()
         self.reward_list = arcade.SpriteList()
+        self.laser_bullet_list = arcade.SpriteList()
+        self.laser_gun_list = arcade.SpriteList()
+        for _ in range(2):
+            self.laser_gun_list.append(arcade.SpriteSolidColor(
+                LASER_GUN_WIDTH,
+                LASER_GUN_HEIGHT,
+                color=LASER_GUN_COLOR,
+            ))
+        self.laser_active = False
+        self.update_laser_guns()
 
         # 重置游戏状态 / Reset game state
         self.score = 0
@@ -353,6 +370,9 @@ class BreakoutGame(arcade.Window):
 
         # 绘制挡板 / Draw paddle
         self.paddle_list.draw()
+        if self.laser_active:
+            self.laser_gun_list.draw()
+        self.laser_bullet_list.draw()
 
         # 绘制奖励物件 / Draw rewards
         self.reward_list.draw()
@@ -473,6 +493,11 @@ class BreakoutGame(arcade.Window):
         self.clamp_paddle_to_screen()
 
         self.update_rewards(delta_time)
+        if self.game_status != GameStatus.PLAYING:
+            self.update_particles(delta_time)
+            return
+
+        self.update_lasers(delta_time)
 
         # 更新球的位置 / Update ball position
         self.ball.center_x += self.ball.change_x * delta_time
@@ -595,6 +620,8 @@ class BreakoutGame(arcade.Window):
             if arcade.check_for_collision(reward, self.paddle):
                 self.apply_reward(reward.reward_type)
                 rewards_to_remove.append(reward)
+                if self.game_status != GameStatus.PLAYING:
+                    break
             elif reward.center_y + REWARD_RADIUS < paddle_bottom:
                 rewards_to_remove.append(reward)
 
@@ -609,12 +636,75 @@ class BreakoutGame(arcade.Window):
             self.resize_paddle(self.paddle.width + PADDLE_REWARD_SIZE_STEP)
         elif reward_type == REWARD_TYPE_SHRINK_PADDLE:
             self.resize_paddle(self.paddle.width - PADDLE_REWARD_SIZE_STEP)
+        elif reward_type == REWARD_TYPE_RESET:
+            self.reset_active_rewards()
+        elif reward_type == REWARD_TYPE_LASER:
+            self.laser_active = True
+            self.update_laser_guns()
+        elif reward_type == REWARD_TYPE_SKULL:
+            self.game_status = GameStatus.GAME_OVER
+            self.laser_active = False
+            self.laser_bullet_list.clear()
+
+    def reset_active_rewards(self):
+        """清除所有持续奖励 / Clear all persistent collected rewards."""
+        self.ball.deactivate_fireball()
+        self.laser_active = False
+        self.laser_bullet_list.clear()
+        self.resize_paddle(PADDLE_WIDTH)
+
+    def update_laser_guns(self):
+        if not self.laser_gun_list:
+            return
+        centers = (
+            self.paddle.center_x - self.paddle.width / 2 + LASER_GUN_SIDE_INSET + LASER_GUN_WIDTH / 2,
+            self.paddle.center_x + self.paddle.width / 2 - LASER_GUN_SIDE_INSET - LASER_GUN_WIDTH / 2,
+        )
+        for gun, center_x in zip(self.laser_gun_list, centers):
+            gun.center_x = center_x
+            gun.center_y = self.paddle.center_y + PADDLE_HEIGHT / 2 + LASER_GUN_HEIGHT / 2 - 3
+
+    def fire_lasers(self):
+        if not self.laser_active or self.game_status != GameStatus.PLAYING:
+            return
+        self.update_laser_guns()
+        for gun in self.laser_gun_list:
+            bullet = arcade.SpriteSolidColor(
+                LASER_BULLET_WIDTH,
+                LASER_BULLET_HEIGHT,
+                center_x=gun.center_x,
+                center_y=gun.top + LASER_BULLET_HEIGHT / 2,
+                color=LASER_BULLET_COLOR,
+            )
+            self.laser_bullet_list.append(bullet)
+
+    def update_lasers(self, delta_time):
+        self.update_laser_guns()
+        bullets_to_remove = []
+        for bullet in self.laser_bullet_list:
+            bullet.center_y += LASER_BULLET_SPEED * delta_time
+            hit_bricks = arcade.check_for_collision_with_list(bullet, self.brick_list)
+            if hit_bricks:
+                brick = min(hit_bricks, key=lambda candidate: candidate.center_y)
+                brick_x, brick_y, brick_color = brick.center_x, brick.center_y, brick.brick_color
+                brick.remove_from_sprite_lists()
+                self.score += SCORE_PER_BRICK
+                self.create_explosion(brick_x, brick_y, brick_color)
+                bullets_to_remove.append(bullet)
+            elif bullet.bottom > SCREEN_HEIGHT:
+                bullets_to_remove.append(bullet)
+
+        for bullet in bullets_to_remove:
+            bullet.remove_from_sprite_lists()
+        if len(self.brick_list) == 0:
+            self.game_status = GameStatus.VICTORY
 
     def resize_paddle(self, width):
         """调整挡板宽度并保持中心位置 / Resize paddle around its center."""
         new_width = max(PADDLE_MIN_WIDTH, min(PADDLE_MAX_WIDTH, width))
         self.paddle.set_paddle_width(new_width)
         self.clamp_paddle_to_screen()
+        self.update_laser_guns()
 
     def clamp_paddle_to_screen(self):
         """根据当前动态宽度限制挡板 / Clamp using the current dynamic width."""
@@ -791,6 +881,13 @@ class BreakoutGame(arcade.Window):
         # 如果游戏未开始，球跟随挡板 / If game hasn't started, ball follows paddle
         if self.game_status == GameStatus.NOT_STARTED:
             self.ball.center_x = self.paddle.center_x
+
+        self.update_laser_guns()
+
+    def on_mouse_press(self, x, y, button, modifiers):
+        """鼠标左键发射双激光 / Fire twin lasers with the left mouse button."""
+        if button == arcade.MOUSE_BUTTON_LEFT:
+            self.fire_lasers()
 
 
 def main():
