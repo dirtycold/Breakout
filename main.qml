@@ -9,6 +9,7 @@ Window {
     visible: true
     title: config.screenTitleQml
     color: config.backgroundColor
+    property real paddleVisualX: (width - config.paddleWidth) / 2
 
     // 游戏配置（从 Python constants 读取）
     GameConfigProvider {
@@ -23,6 +24,14 @@ Window {
     // 游戏控制器（Python 后端）
     GameController {
         id: gameController
+    }
+
+    Connections {
+        target: gameController
+
+        function onPaddleXChanged(paddleX) {
+            root.paddleVisualX = paddleX
+        }
     }
 
     // 主游戏区域（用于接收键盘输入）
@@ -71,7 +80,13 @@ Window {
             anchors.fill: parent
             hoverEnabled: true
             onPositionChanged: function(mouse) {
-                gameController.setPaddleX(mouse.x - paddle.width / 2)
+                var nextX = Math.max(
+                    0,
+                    Math.min(root.width - paddle.width, mouse.x - paddle.width / 2)
+                )
+                // Update the visible paddle before crossing the QML/Python boundary.
+                root.paddleVisualX = nextX
+                gameController.setPaddleX(nextX)
             }
         }
 
@@ -129,7 +144,7 @@ Window {
             height: config.paddleHeight
             color: "transparent"
             radius: config.paddleCornerRadius
-            x: gameController ? gameController.paddleX : (root.width - width) / 2
+            x: root.paddleVisualX
             y: config.paddleY
 
             property real gradientOffset: 0
