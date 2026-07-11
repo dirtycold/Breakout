@@ -797,6 +797,24 @@ class GameController(QObject):
             self._state.gameStatus = GameStatus.PLAYING
 
     @Slot()
+    def handleSpace(self):
+        """空格键统一处理开始、暂停、继续和重开 / Handle the full SPACE state machine."""
+        status = self._state.gameStatus
+        if status == GameStatus.NOT_STARTED:
+            self.startGame()
+        elif status == GameStatus.PLAYING:
+            self._paddle_move_left = False
+            self._paddle_move_right = False
+            self._state.message = MESSAGE_PAUSED
+            self._state.gameStatus = GameStatus.PAUSED
+        elif status == GameStatus.PAUSED:
+            self._state.message = ""
+            self._state.gameStatus = GameStatus.PLAYING
+        elif status in (GameStatus.GAME_OVER, GameStatus.VICTORY):
+            self.resetGame()
+            self.startGame()
+
+    @Slot()
     def resetGame(self):
         """重置游戏 / Reset Game"""
         self._set_paddle_width(PADDLE_WIDTH)
@@ -1034,6 +1052,9 @@ class GameController(QObject):
 
     def _update(self):
         """游戏主循环 / Main Game Loop"""
+        if self._state.gameStatus == GameStatus.PAUSED:
+            return
+
         self._ball.update_rotation(FIXED_DELTA_TIME)
         self._update_paddle(FIXED_DELTA_TIME)
 

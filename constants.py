@@ -13,6 +13,7 @@ class GameStatus(IntEnum):
     PLAYING = 1      # 游戏中
     GAME_OVER = 2    # 游戏失败
     VICTORY = 3      # 胜利
+    PAUSED = 4       # 暂停
 
 
 class RewardCategory(IntEnum):
@@ -35,16 +36,21 @@ MESSAGE_START_LINES = (
     "← → 移动挡板 / Move Paddle",
 )
 MESSAGE_GAME_OVER_LINES = (
-    "游戏结束！按 R 重新开始",
-    "Game Over! Press R to Restart",
+    "游戏结束！按空格键重新开始",
+    "Game Over! Press SPACE to Restart",
 )
 MESSAGE_VICTORY_LINES = (
-    "恭喜胜利！按 R 重新开始",
-    "Victory! Press R to Restart",
+    "恭喜胜利！按空格键重新开始",
+    "Victory! Press SPACE to Restart",
+)
+MESSAGE_PAUSED_LINES = (
+    "游戏暂停",
+    "Paused — Press SPACE to Resume",
 )
 MESSAGE_START = "\n".join(MESSAGE_START_LINES)
 MESSAGE_GAME_OVER = "\n".join(MESSAGE_GAME_OVER_LINES)
 MESSAGE_VICTORY = "\n".join(MESSAGE_VICTORY_LINES)
+MESSAGE_PAUSED = "\n".join(MESSAGE_PAUSED_LINES)
 
 # 字号设置 / Font Size Settings
 GAME_FONT_FAMILIES = (

@@ -45,11 +45,8 @@ Window {
                 return
             }
 
-            if (event.key === Qt.Key_Space && gameController && gameController.state && gameController.state.gameStatus === gameStatus.NOT_STARTED) {
-                gameController.startGame()
-                event.accepted = true
-            } else if (event.key === Qt.Key_R) {
-                gameController.resetGame()
+            if (event.key === Qt.Key_Space) {
+                gameController.handleSpace()
                 event.accepted = true
             } else if (event.key === Qt.Key_Left) {
                 gameController.setPaddleMovingLeft(true)
@@ -81,6 +78,9 @@ Window {
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton
             onPositionChanged: function(mouse) {
+                if (gameController.state.gameStatus === gameStatus.PAUSED) {
+                    return
+                }
                 var nextX = Math.max(
                     0,
                     Math.min(root.width - paddle.width, mouse.x - paddle.width / 2)

@@ -72,6 +72,10 @@ class GameStatusProvider(QObject):
     def VICTORY(self):
         return int(GameStatus.VICTORY)
 
+    @Property(int, constant=True)
+    def PAUSED(self):
+        return int(GameStatus.PAUSED)
+
 
 class GameConfigProvider(QObject):
     """共享游戏配置提供器 / Shared Game Config Provider"""

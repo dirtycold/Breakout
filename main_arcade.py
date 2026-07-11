@@ -293,6 +293,7 @@ class BreakoutGame(arcade.Window):
         # 移动标志 / Movement flags
         self.left_pressed = False
         self.right_pressed = False
+        self.space_pressed = False
 
         # 游戏状态 / Game state
         self.score = 0
@@ -457,8 +458,29 @@ class BreakoutGame(arcade.Window):
                 anchor_x="center"
             )
 
+        if self.game_status == GameStatus.PAUSED:
+            arcade.draw_text(
+                MESSAGE_PAUSED_LINES[0],
+                SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2,
+                arcade.color.WHITE,
+                MESSAGE_PRIMARY_FONT_SIZE,
+                font_name=GAME_FONT_FAMILIES,
+                anchor_x="center",
+            )
+            arcade.draw_text(
+                MESSAGE_PAUSED_LINES[1],
+                SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 40,
+                arcade.color.WHITE,
+                MESSAGE_SECONDARY_FONT_SIZE,
+                font_name=GAME_FONT_FAMILIES,
+                anchor_x="center",
+            )
+
     def on_update(self, delta_time):
         """更新游戏逻辑 / Update game logic"""
+        if self.game_status == GameStatus.PAUSED:
+            return
+
         self.paddle.update_animation(delta_time)
 
         if self.game_status in (GameStatus.GAME_OVER, GameStatus.VICTORY):
@@ -852,16 +874,20 @@ class BreakoutGame(arcade.Window):
         elif key == arcade.key.RIGHT:
             self.right_pressed = True
         elif key == arcade.key.SPACE:
-            # 按空格键开始游戏 / Press space to start game
+            if self.space_pressed:
+                return
+            self.space_pressed = True
             if self.game_status == GameStatus.NOT_STARTED:
+                self.start_playing()
+            elif self.game_status == GameStatus.PLAYING:
+                self.left_pressed = False
+                self.right_pressed = False
+                self.game_status = GameStatus.PAUSED
+            elif self.game_status == GameStatus.PAUSED:
                 self.game_status = GameStatus.PLAYING
-                # 发射球 / Launch ball
-                angle = math.radians(BALL_START_ANGLE)
-                self.ball.change_x = BALL_SPEED * math.cos(angle)
-                self.ball.change_y = BALL_SPEED * math.sin(angle)
-        elif key == arcade.key.R:
-            # 重新开始游戏 / Restart game
-            self.setup()
+            elif self.game_status in (GameStatus.GAME_OVER, GameStatus.VICTORY):
+                self.setup()
+                self.start_playing()
 
     def on_key_release(self, key, modifiers):
         """按键释放事件 / Key release event"""
@@ -870,9 +896,13 @@ class BreakoutGame(arcade.Window):
             self.left_pressed = False
         elif key == arcade.key.RIGHT:
             self.right_pressed = False
+        elif key == arcade.key.SPACE:
+            self.space_pressed = False
 
     def on_mouse_motion(self, x, y, dx, dy):
         """鼠标移动事件 / Mouse motion event"""
+        if self.game_status == GameStatus.PAUSED:
+            return
         # 使用鼠标X坐标控制挡板位置 / Use mouse X coordinate to control paddle
         self.paddle.center_x = x
 
@@ -889,6 +919,13 @@ class BreakoutGame(arcade.Window):
         """鼠标左键发射双激光 / Fire twin lasers with the left mouse button."""
         if button == arcade.MOUSE_BUTTON_LEFT:
             self.fire_lasers()
+
+    def start_playing(self):
+        """发射小球并进入游戏 / Launch the ball and enter play."""
+        self.game_status = GameStatus.PLAYING
+        angle = math.radians(BALL_START_ANGLE)
+        self.ball.change_x = BALL_SPEED * math.cos(angle)
+        self.ball.change_y = BALL_SPEED * math.sin(angle)
 
 
 def main():
