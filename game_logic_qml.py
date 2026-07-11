@@ -959,6 +959,9 @@ class GameController(QObject):
         self._state.score += SCORE_PER_BRICK
         self._state.brickCount -= 1
         self._particle_model.create_explosion(center_x, center_y, brick["color"])
+        reward_type = choose_reward_type()
+        if reward_type is not None:
+            self._reward_model.create_reward(reward_type, center_x, center_y, 0)
         if self._state.brickCount <= 0:
             self._state.gameStatus = GameStatus.VICTORY
             self._state.message = MESSAGE_VICTORY

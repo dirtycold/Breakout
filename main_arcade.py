@@ -690,6 +690,7 @@ class BreakoutGame(arcade.Window):
                 brick.remove_from_sprite_lists()
                 self.score += SCORE_PER_BRICK
                 self.create_explosion(brick_x, brick_y, brick_color)
+                self.spawn_reward(brick_x, brick_y, 0)
                 bullets_to_remove.append(bullet)
             elif bullet.bottom > SCREEN_HEIGHT:
                 bullets_to_remove.append(bullet)

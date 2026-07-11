@@ -1,5 +1,6 @@
 import unittest
 from types import MethodType
+from unittest.mock import patch
 
 import arcade
 from qtpy.QtCore import QCoreApplication
@@ -11,6 +12,8 @@ from constants import (
     LASER_GUN_COLOR,
     LASER_GUN_HEIGHT,
     LASER_GUN_WIDTH,
+    BRICK_HEIGHT,
+    BRICK_WIDTH,
     PADDLE_HEIGHT,
     PADDLE_WIDTH,
     REWARD_TYPE_EXTEND_PADDLE,
@@ -21,7 +24,7 @@ from constants import (
     SCORE_PER_BRICK,
 )
 from game_logic_qml import GameController
-from main_arcade import BreakoutGame, RainbowBall, RoundedRectPaddle
+from main_arcade import BreakoutGame, RainbowBall, RoundedRectBrick, RoundedRectPaddle
 
 
 _APP = QCoreApplication.instance() or QCoreApplication([])
@@ -51,12 +54,28 @@ class LaserRewardTests(unittest.TestCase):
         }]
         old_count = self.controller.state.brickCount
 
-        self.controller._update_lasers(0)
+        with patch("game_logic_qml.choose_reward_type", return_value=None):
+            self.controller._update_lasers(0)
 
         self.assertTrue(self.controller.brickModel.brick_at(brick_row)["destroyed"])
         self.assertEqual(self.controller.state.brickCount, old_count - 1)
         self.assertEqual(self.controller.state.score, SCORE_PER_BRICK)
         self.assertEqual(len(self.controller.laserModel._bullets), 0)
+
+    def test_qml_laser_hit_can_spawn_a_reward(self):
+        brick_row, brick = next(self.controller.brickModel.active_brick_rows())
+        self.controller.laserModel._bullets = [{
+            "x": brick["x"],
+            "y": brick["y"],
+            "width": LASER_BULLET_WIDTH,
+            "height": LASER_BULLET_HEIGHT,
+        }]
+
+        with patch("game_logic_qml.choose_reward_type", return_value=REWARD_TYPE_LASER):
+            self.controller._update_lasers(0)
+
+        self.assertEqual(self.controller.rewardModel.rowCount(), 1)
+        self.assertEqual(self.controller.rewardModel._rewards[0]["type"], REWARD_TYPE_LASER)
 
     def test_arcade_laser_reset_and_skull_effects(self):
         class ArcadeGameHarness:
@@ -101,6 +120,44 @@ class LaserRewardTests(unittest.TestCase):
 
         game.apply_reward(REWARD_TYPE_SKULL)
         self.assertEqual(game.game_status, GameStatus.GAME_OVER)
+
+    def test_arcade_laser_hit_calls_reward_drop(self):
+        class ArcadeGameHarness:
+            pass
+
+        game = ArcadeGameHarness()
+        for method_name in ("update_laser_guns", "update_lasers"):
+            setattr(game, method_name, MethodType(getattr(BreakoutGame, method_name), game))
+        game.paddle = RoundedRectPaddle(PADDLE_WIDTH, PADDLE_HEIGHT, (52, 152, 219))
+        game.paddle.center_x = 400
+        game.paddle.center_y = 50
+        game.laser_gun_list = arcade.SpriteList()
+        for _ in range(2):
+            game.laser_gun_list.append(arcade.SpriteSolidColor(
+                LASER_GUN_WIDTH,
+                LASER_GUN_HEIGHT,
+                color=LASER_GUN_COLOR,
+            ))
+        game.laser_bullet_list = arcade.SpriteList()
+        game.brick_list = arcade.SpriteList()
+        brick = RoundedRectBrick(BRICK_WIDTH, BRICK_HEIGHT, (255, 107, 107))
+        brick.center_x = 400
+        brick.center_y = 300
+        game.brick_list.append(brick)
+        bullet = arcade.SpriteSolidColor(LASER_BULLET_WIDTH, LASER_BULLET_HEIGHT)
+        bullet.center_x = brick.center_x
+        bullet.center_y = brick.center_y
+        game.laser_bullet_list.append(bullet)
+        game.score = 0
+        game.game_status = GameStatus.PLAYING
+        game.create_explosion = lambda *_args: None
+        reward_spawns = []
+        game.spawn_reward = lambda *args: reward_spawns.append(args)
+
+        game.update_lasers(0)
+
+        self.assertEqual(len(reward_spawns), 1)
+        self.assertEqual(len(game.brick_list), 0)
 
 
 if __name__ == "__main__":
