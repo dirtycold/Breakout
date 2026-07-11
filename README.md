@@ -139,14 +139,15 @@ Breakout/
 
 当前奖励系统已经具备完整生命周期：
 
-1. 小球破坏砖块时触发奖励掉落。
-2. 奖励物件从砖块中心生成，水平初速度跟随小球运动方向，垂直方向先获得向上的初速度，然后受重力下落。
+1. 小球破坏砖块时按概率触发奖励掉落。
+2. 奖励物件从砖块中心生成；每个实例会随机获得水平速度、上抛速度、重力与旋转速度，因此拥有不同的运动轨迹。
 3. 奖励与挡板碰撞时被接取并应用效果。
 4. 奖励碰到左右墙会反弹；落到挡板下方后销毁，不再产生效果。
+5. 奖励以更醒目的方块贴图显示；火球图标由 Pillow 在内存中绘制，不依赖外部图片文件。
 
 当前启用的奖励：
 
-- **火球 / Fireball**：触发概率暂为 `100%`。接取后小球带有火焰粒子尾迹；小球命中砖块时，会沿命中前的小球运动方向最多破坏 4 块砖（命中砖块 + 前方最多 3 块）。
+- **火球 / Fireball**：每块砖独立以 `28%` 概率掉落。接取后小球带有火焰粒子尾迹；小球命中砖块时，只会破坏首个命中砖块及运动方向一侧局部 `2x2` 范围内的砖块。
 
 奖励分类规划：
 
@@ -184,9 +185,9 @@ Breakout/
 - `PADDLE_SPEED`: 挡板移动速度
 - `BALL_SPEED`: 球的初始速度
 - `BALL_START_ANGLE`: 球的发射角度（度）
-- `REWARD_TRIGGER_PROBABILITY`: 砖块触发奖励的概率（当前为 `1.0`）
-- `REWARD_INITIAL_SPEED_X` / `REWARD_INITIAL_SPEED_Y` / `REWARD_GRAVITY`: 奖励物件水平运动、上抛和自由落体参数
-- `FIREBALL_PATH_EXTRA_BRICKS` / `FIREBALL_PATH_WIDTH`: 火球沿运动方向追加破坏砖块的数量和路径宽度
+- `REWARD_TRIGGER_PROBABILITY`: 砖块触发奖励的概率（当前为 `0.28`）
+- `REWARD_MIN/MAX_SPEED_X/Y` / `REWARD_MIN/MAX_GRAVITY`: 奖励物件随机轨迹范围
+- `FIREBALL_IMPACT_COLUMNS` / `FIREBALL_IMPACT_ROWS`: 火球撞击的局部砖块范围（当前为 `2x2`）
 
 ### 视觉效果
 - `BRICK_COLORS`: 砖块颜色列表（RGB 元组）

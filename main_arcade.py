@@ -622,13 +622,10 @@ class BreakoutGame(arcade.Window):
             self.game_status = GameStatus.VICTORY
 
     def bricks_in_fireball_path(self, source_brick, direction_x, direction_y):
-        """返回火球运动方向上的最多 4 块砖 / Return up to 4 bricks along fireball direction."""
-        speed = math.hypot(direction_x, direction_y)
-        if speed <= 1e-6:
+        """返回撞击砖块运动方向一侧的 2x2 局部砖块 / Return the directional local 2x2 area."""
+        if math.hypot(direction_x, direction_y) <= 1e-6:
             return [source_brick]
 
-        dir_x = direction_x / speed
-        dir_y = direction_y / speed
         candidates = []
 
         for brick in list(self.brick_list):
@@ -637,18 +634,18 @@ class BreakoutGame(arcade.Window):
 
             offset_x = brick.center_x - source_brick.center_x
             offset_y = brick.center_y - source_brick.center_y
-            projection = offset_x * dir_x + offset_y * dir_y
-            if projection <= 0:
-                continue
+            if inside_fireball_impact_area(
+                offset_x,
+                offset_y,
+                direction_x,
+                direction_y,
+            ):
+                candidates.append((offset_x * offset_x + offset_y * offset_y, brick))
 
-            perpendicular = abs(offset_x * dir_y - offset_y * dir_x)
-            if perpendicular <= FIREBALL_PATH_WIDTH:
-                candidates.append((projection, perpendicular, brick))
-
-        candidates.sort(key=lambda item: (item[0], item[1]))
+        candidates.sort(key=lambda item: item[0])
         return [
             source_brick,
-            *[brick for _, _, brick in candidates[:FIREBALL_PATH_EXTRA_BRICKS]],
+            *[brick for _, brick in candidates[:3]],
         ]
 
     def bricks_near(self, source_brick):

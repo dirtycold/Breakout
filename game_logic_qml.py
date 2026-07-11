@@ -127,19 +127,16 @@ class BrickModel(QAbstractListModel):
                 yield row, brick
 
     def active_rows_in_fireball_path(self, source_row, direction_x, direction_y):
-        """返回火球运动方向上的最多 4 块砖 / Return up to 4 brick rows along fireball direction."""
+        """返回撞击砖块运动方向一侧的 2x2 局部砖块 / Return the directional local 2x2 area."""
         if not 0 <= source_row < len(self._bricks):
             return []
 
-        speed = math.hypot(direction_x, direction_y)
-        if speed <= 1e-6:
+        if math.hypot(direction_x, direction_y) <= 1e-6:
             return [source_row]
 
         source = self._bricks[source_row]
         source_center_x = source["x"] + source["width"] / 2
         source_center_y = source["y"] + source["height"] / 2
-        dir_x = direction_x / speed
-        dir_y = direction_y / speed
         candidates = []
 
         for row, brick in enumerate(self._bricks):
@@ -150,18 +147,18 @@ class BrickModel(QAbstractListModel):
             brick_center_y = brick["y"] + brick["height"] / 2
             offset_x = brick_center_x - source_center_x
             offset_y = brick_center_y - source_center_y
-            projection = offset_x * dir_x + offset_y * dir_y
-            if projection <= 0:
-                continue
+            if inside_fireball_impact_area(
+                offset_x,
+                offset_y,
+                direction_x,
+                direction_y,
+            ):
+                candidates.append((offset_x * offset_x + offset_y * offset_y, row))
 
-            perpendicular = abs(offset_x * dir_y - offset_y * dir_x)
-            if perpendicular <= FIREBALL_PATH_WIDTH:
-                candidates.append((projection, perpendicular, row))
-
-        candidates.sort(key=lambda item: (item[0], item[1]))
+        candidates.sort(key=lambda item: item[0])
         return [
             source_row,
-            *[row for _, _, row in candidates[:FIREBALL_PATH_EXTRA_BRICKS]],
+            *[row for _, row in candidates[:3]],
         ]
 
 
