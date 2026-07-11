@@ -640,6 +640,7 @@ class BreakoutGame(arcade.Window):
                 reward.change_x = -abs(reward.change_x)
 
             if arcade.check_for_collision(reward, self.paddle):
+                self.score += SCORE_PER_REWARD
                 self.apply_reward(reward.reward_type)
                 rewards_to_remove.append(reward)
                 if self.game_status != GameStatus.PLAYING:

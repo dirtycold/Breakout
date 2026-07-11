@@ -1065,6 +1065,7 @@ class GameController(QObject):
                 self._paddle_y,
                 self._paddle_width,
             ):
+                self._state.score += SCORE_PER_REWARD
                 self._apply_reward(reward_type)
                 if self._state.gameStatus != GameStatus.PLAYING:
                     break

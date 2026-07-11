@@ -44,7 +44,7 @@ MESSAGE_VICTORY_LINES = (
     "Victory! Press SPACE to Restart",
 )
 MESSAGE_PAUSED_LINES = (
-    "游戏暂停",
+    "游戏暂停！按空格键继续",
     "Paused — Press SPACE to Resume",
 )
 MESSAGE_START = "\n".join(MESSAGE_START_LINES)
@@ -190,6 +190,7 @@ BRICK_TOP_MARGIN = 80  # 距离顶部的距离
 BRICK_LEFT_MARGIN = 30  # 距离左侧的距离
 BRICK_CORNER_RADIUS = 6
 SCORE_PER_BRICK = 10
+SCORE_PER_REWARD = 5
 
 # 奖励设置 / Reward Settings
 REWARD_TYPE_FIREBALL = "fireball"

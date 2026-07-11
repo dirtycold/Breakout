@@ -140,7 +140,7 @@ Breakout/
 
 1. 小球破坏砖块时按概率触发奖励掉落。
 2. 奖励物件从砖块中心生成；每个实例会随机获得水平速度、上抛速度、重力与旋转速度，因此拥有不同的运动轨迹。
-3. 奖励与挡板碰撞时被接取并应用效果。
+3. 奖励与挡板碰撞时被接取，增加 `5` 分后应用效果。
 4. 奖励碰到左右墙会反弹；落到挡板下方后销毁，不再产生效果。
 5. 奖励以更醒目的方块贴图显示；图标均由 Pillow 在内存中绘制，不依赖外部图片文件。
 6. 当前总掉落概率为 `50%`；普通奖励权重为 `1`，骷髅权重为 `0.5`，因此消极奖励的概率是任一其他奖励的一半。
@@ -193,6 +193,7 @@ Breakout/
 - `BALL_SPEED`: 球的初始速度
 - `BALL_START_ANGLE`: 球的发射角度（度）
 - `REWARD_TRIGGER_PROBABILITY`: 砖块触发任意奖励的总概率（当前为 `0.5`）
+- `SCORE_PER_REWARD`: 成功接取奖励块的分数（当前为 `5`）
 - `PADDLE_REWARD_SIZE_STEP` / `PADDLE_MIN/MAX_WIDTH`: 挡板尺寸奖励的步长和边界
 - `REWARD_MIN/MAX_SPEED_X/Y` / `REWARD_MIN/MAX_GRAVITY`: 奖励物件随机轨迹范围
 - `FIREBALL_IMPACT_COLUMNS` / `FIREBALL_IMPACT_ROWS`: 火球撞击的局部砖块范围（当前为 `2x2`）
