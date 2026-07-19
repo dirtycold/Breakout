@@ -55,10 +55,13 @@ class GameStateTests(unittest.TestCase):
         game.ball = SimpleNamespace(change_x=0.0, change_y=0.0)
         game.start_playing = MethodType(BreakoutGame.start_playing, game)
         game.on_key_press = MethodType(BreakoutGame.on_key_press, game)
+        game.release_magnet_ball = MethodType(BreakoutGame.release_magnet_ball, game)
+        game.magnet_attached = False
 
         def setup():
             game.game_status = GameStatus.NOT_STARTED
             game.ball = SimpleNamespace(change_x=0.0, change_y=0.0)
+            game.magnet_attached = False
 
         game.setup = setup
 

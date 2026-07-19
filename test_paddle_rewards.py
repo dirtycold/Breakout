@@ -13,6 +13,7 @@ from constants import (
     REWARD_TYPE_EXTEND_PADDLE,
     REWARD_TYPE_FIREBALL,
     REWARD_TYPE_LASER,
+    REWARD_TYPE_MAGNET,
     REWARD_TYPE_RESET,
     REWARD_TYPE_SHRINK_PADDLE,
     REWARD_TYPE_SKULL,
@@ -81,12 +82,14 @@ class PaddleRewardTests(unittest.TestCase):
         self.controller._apply_reward(REWARD_TYPE_FIREBALL)
         self.controller._apply_reward(REWARD_TYPE_EXTEND_PADDLE)
         self.controller._apply_reward(REWARD_TYPE_LASER)
+        self.controller._apply_reward(REWARD_TYPE_MAGNET)
         self.controller.fireLaser()
         self.assertEqual(len(self.controller.laserModel._bullets), 2)
 
         self.controller._apply_reward(REWARD_TYPE_RESET)
         self.assertFalse(self.controller.ball.fireball_active)
         self.assertFalse(self.controller.laserActive)
+        self.assertFalse(self.controller.magnetActive)
         self.assertEqual(self.controller.paddleWidth, PADDLE_WIDTH)
         self.assertEqual(len(self.controller.laserModel._bullets), 0)
 

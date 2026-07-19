@@ -90,7 +90,7 @@ Window {
                 gameController.setPaddleX(nextX)
             }
             onPressed: function(mouse) {
-                gameController.fireLaser()
+                gameController.handlePrimaryAction()
                 mouse.accepted = true
             }
         }
@@ -172,6 +172,7 @@ Window {
 
             property real gradientOffset: 0
             property int frameIndex: 0
+            property int magnetFrameIndex: 0
 
             Item {
                 id: paddleTextureViewport
@@ -212,6 +213,25 @@ Window {
                 y: -height + 3
             }
 
+            Item {
+                visible: gameController.ball.magnetAttached
+                width: config.magnetEffectWidth
+                height: config.magnetEffectHeight
+                x: gameController.ball.x - paddle.x - width / 2
+                y: -(height - 5)
+                clip: true
+
+                Image {
+                    x: -paddle.magnetFrameIndex * config.magnetEffectWidth
+                    y: 0
+                    width: config.magnetEffectWidth * config.magnetEffectFrameCount
+                    height: config.magnetEffectHeight
+                    source: gameController.magnetEffectTextureSource
+                    smooth: false
+                    cache: true
+                }
+            }
+
             // 键盘移动逻辑
             Timer {
                 running: true
@@ -225,6 +245,17 @@ Window {
                     if (nextFrameIndex !== paddle.frameIndex) {
                         paddle.frameIndex = nextFrameIndex
                     }
+                }
+            }
+
+            Timer {
+                running: gameController.ball.magnetAttached
+                         && gameController.state.gameStatus === gameStatus.PLAYING
+                repeat: true
+                interval: config.magnetEffectFrameIntervalMs
+                onTriggered: {
+                    paddle.magnetFrameIndex =
+                        (paddle.magnetFrameIndex + 1) % config.magnetEffectFrameCount
                 }
             }
         }

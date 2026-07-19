@@ -194,6 +194,57 @@ def create_laser_reward_image(size=REWARD_SIZE):
 
 
 @lru_cache(maxsize=4)
+def create_magnet_reward_image(size=REWARD_SIZE):
+    """Draw a bright horseshoe magnet on a positive green hint."""
+    image, draw, scale = _create_reward_canvas(
+        size,
+        background=(*REWARD_FIREBALL_COLOR, 246),
+        border=(*REWARD_FIREBALL_BORDER_COLOR, 255),
+    )
+
+    # A thick horseshoe silhouette, with cyan pole caps to match the paddle arcs.
+    magnet_red = (239, 68, 68, 255)
+    magnet_shadow = (153, 27, 27, 255)
+    pole = (*MAGNET_EFFECT_COLOR, 255)
+    horseshoe = [
+        (10 * scale, 10 * scale),
+        (10 * scale, 21 * scale),
+        (13 * scale, 27 * scale),
+        (19 * scale, 30 * scale),
+        (25 * scale, 27 * scale),
+        (28 * scale, 21 * scale),
+        (28 * scale, 10 * scale),
+    ]
+    draw.line(
+        horseshoe,
+        fill=magnet_shadow,
+        width=11 * scale,
+        joint="curve",
+    )
+    draw.line(
+        horseshoe,
+        fill=magnet_red,
+        width=7 * scale,
+        joint="curve",
+    )
+    draw.rounded_rectangle(
+        (5 * scale, 6 * scale, 15 * scale, 13 * scale),
+        radius=2 * scale,
+        fill=pole,
+    )
+    draw.rounded_rectangle(
+        (23 * scale, 6 * scale, 33 * scale, 13 * scale),
+        radius=2 * scale,
+        fill=pole,
+    )
+    draw.ellipse(
+        (17 * scale, 17 * scale, 21 * scale, 21 * scale),
+        fill=(224, 242, 254, 245),
+    )
+    return image.resize((size, size), Image.Resampling.LANCZOS)
+
+
+@lru_cache(maxsize=4)
 def create_skull_reward_image(size=REWARD_SIZE):
     """Draw a compact white skull on a negative red hint."""
     image, draw, scale = _create_reward_canvas(
@@ -226,6 +277,8 @@ def create_reward_image(reward_type, size=REWARD_SIZE):
         return create_reset_reward_image(size)
     if reward_type == REWARD_TYPE_LASER:
         return create_laser_reward_image(size)
+    if reward_type == REWARD_TYPE_MAGNET:
+        return create_magnet_reward_image(size)
     if reward_type == REWARD_TYPE_SKULL:
         return create_skull_reward_image(size)
     raise ValueError(f"Unsupported reward type: {reward_type}")

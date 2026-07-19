@@ -26,6 +26,7 @@ from qtpy.QtCore import (
 from ball_texture import RainbowBallMotion, create_rainbow_ball_data_url
 from constants import *
 from fireball_effect import inside_fireball_impact_area
+from magnet_visual import create_magnet_effect_sprite_sheet_data_url
 from paddle_texture import create_paddle_sprite_sheet_data_url
 from reward_visual import (
     choose_reward_type,
@@ -573,6 +574,7 @@ class Ball(QObject):
 
     positionChanged = Signal(float, float)
     rotationChanged = Signal(float)
+    magnetAttachedChanged = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -582,6 +584,9 @@ class Ball(QObject):
         self._dy = 0
         self._active = False
         self._fireball_active = False
+        self._magnet_attached = False
+        self._magnet_offset = 0.0
+        self._magnet_speed = BALL_SPEED
         self._motion = RainbowBallMotion()
         self._rotation = self._motion.rotation
         self._texture_source = create_rainbow_ball_data_url(BALL_RADIUS)
@@ -602,9 +607,14 @@ class Ball(QObject):
     def textureSource(self):
         return self._texture_source
 
+    @Property(bool, notify=magnetAttachedChanged)
+    def magnetAttached(self):
+        return self._magnet_attached
+
     @Slot()
     def launch(self):
         """发射球 / Launch Ball"""
+        self._set_magnet_attached(False)
         angle_rad = math.radians(BALL_START_ANGLE)
         self._dx = BALL_SPEED * math.cos(angle_rad)
         self._dy = -BALL_SPEED * math.sin(angle_rad)  # 向上为负
@@ -613,7 +623,7 @@ class Ball(QObject):
     @Slot(float)
     def update(self, delta_time):
         """更新球的位置 / Update Ball Position"""
-        if not self._active:
+        if not self._active or self._magnet_attached:
             return
 
         # 更新位置（乘以 delta_time 控制速度）
@@ -636,10 +646,10 @@ class Ball(QObject):
         self._rotation = self._motion.update(delta_time)
         self.rotationChanged.emit(self._rotation)
 
-    @Slot(float, float, float, result=bool)
-    def checkPaddleCollision(self, paddle_x, paddle_y, paddle_width):
+    @Slot(float, float, float, bool, result=bool)
+    def checkPaddleCollision(self, paddle_x, paddle_y, paddle_width, magnet_active=False):
         """检测与挡板碰撞 / Check Paddle Collision"""
-        if not self._active:
+        if not self._active or self._magnet_attached:
             return False
 
         if (self._y + BALL_RADIUS >= paddle_y and
@@ -650,6 +660,10 @@ class Ball(QObject):
             # 计算反弹角度和旋转 / Calculate bounce angle and spin
             hit_pos = (self._x - paddle_x) / paddle_width  # 0.0 到 1.0
             relative_hit = max(-1.0, min(1.0, hit_pos * 2 - 1))
+            if magnet_active and self._dy > 0:
+                self._attach_to_paddle(paddle_x, paddle_y, paddle_width)
+                return True
+
             angle = relative_hit * PADDLE_BOUNCE_MAX_ANGLE
             angle_rad = math.radians(angle)
 
@@ -677,6 +691,9 @@ class Ball(QObject):
         self._dy = 0
         self._active = False
         self._fireball_active = False
+        self._set_magnet_attached(False)
+        self._magnet_offset = 0.0
+        self._magnet_speed = BALL_SPEED
         self._motion.reset()
         self._rotation = self._motion.rotation
         self.positionChanged.emit(self._x, self._y)
@@ -696,11 +713,55 @@ class Ball(QObject):
 
     @Slot(float, float)
     def followPaddle(self, paddle_x, paddle_width):
-        """球跟随挡板移动（游戏未开始时）/ Ball follows paddle"""
-        if not self._active:
+        """让待发射或已吸附的小球跟随挡板 / Follow while waiting or attached."""
+        if self._magnet_attached:
+            half_range = max(0.0, paddle_width / 2 - BALL_RADIUS)
+            self._magnet_offset = max(
+                -half_range,
+                min(half_range, self._magnet_offset),
+            )
+            self._x = paddle_x + paddle_width / 2 + self._magnet_offset
+            self._y = qml_paddle_y() - BALL_RADIUS - BALL_PADDLE_GAP
+            self.positionChanged.emit(self._x, self._y)
+        elif not self._active:
             self._x = paddle_x + paddle_width / 2
             self._y = qml_ball_start_center_y()
             self.positionChanged.emit(self._x, self._y)
+
+    def _set_magnet_attached(self, attached):
+        if self._magnet_attached == attached:
+            return
+        self._magnet_attached = attached
+        self.magnetAttachedChanged.emit(attached)
+
+    def _attach_to_paddle(self, paddle_x, paddle_y, paddle_width):
+        half_range = max(0.0, paddle_width / 2 - BALL_RADIUS)
+        paddle_center_x = paddle_x + paddle_width / 2
+        self._magnet_offset = max(
+            -half_range,
+            min(half_range, self._x - paddle_center_x),
+        )
+        self._magnet_speed = max(BALL_SPEED, math.hypot(self._dx, self._dy))
+        self._dx = 0.0
+        self._dy = 0.0
+        self._x = paddle_center_x + self._magnet_offset
+        self._y = paddle_y - BALL_RADIUS - BALL_PADDLE_GAP
+        self._set_magnet_attached(True)
+        self.positionChanged.emit(self._x, self._y)
+
+    def release_from_magnet(self, paddle_width):
+        """Release an attached ball upward from its actual contact point."""
+        if not self._magnet_attached:
+            return False
+
+        half_width = max(BALL_RADIUS, paddle_width / 2)
+        relative_hit = max(-1.0, min(1.0, self._magnet_offset / half_width))
+        angle = math.radians(relative_hit * PADDLE_BOUNCE_MAX_ANGLE)
+        self._dx = self._magnet_speed * math.sin(angle)
+        self._dy = -abs(self._magnet_speed * math.cos(angle))
+        self._motion.set_spin_from_paddle_hit(relative_hit)
+        self._set_magnet_attached(False)
+        return True
 
 
 class GameController(QObject):
@@ -709,6 +770,7 @@ class GameController(QObject):
     paddleXChanged = Signal(float)
     paddleWidthChanged = Signal(float)
     laserActiveChanged = Signal(bool)
+    magnetActiveChanged = Signal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -724,6 +786,7 @@ class GameController(QObject):
         self._paddle_move_left = False
         self._paddle_move_right = False
         self._laser_active = False
+        self._magnet_active = False
 
         self._state.brickCount = total_brick_count()
 
@@ -786,6 +849,14 @@ class GameController(QObject):
     def laserActive(self):
         return self._laser_active
 
+    @Property(bool, notify=magnetActiveChanged)
+    def magnetActive(self):
+        return self._magnet_active
+
+    @Property(str, constant=True)
+    def magnetEffectTextureSource(self):
+        return create_magnet_effect_sprite_sheet_data_url()
+
     @Slot()
     def startGame(self):
         """开始游戏 / Start Game"""
@@ -803,6 +874,8 @@ class GameController(QObject):
         if status == GameStatus.NOT_STARTED:
             self.startGame()
         elif status == GameStatus.PLAYING:
+            if self._ball.release_from_magnet(self._paddle_width):
+                return
             self._paddle_move_left = False
             self._paddle_move_right = False
             self._state.message = MESSAGE_PAUSED
@@ -827,6 +900,7 @@ class GameController(QObject):
         self._reward_model.clear()
         self._laser_model.clear()
         self._set_laser_active(False)
+        self._set_magnet_active(False)
         self._state.score = 0
         self._state.gameStatus = GameStatus.NOT_STARTED
         self._state.message = MESSAGE_START
@@ -863,8 +937,7 @@ class GameController(QObject):
             self._paddle_x = clamped_x
             self.paddleXChanged.emit(self._paddle_x)
 
-            if self._state.gameStatus == GameStatus.NOT_STARTED:
-                self._ball.followPaddle(self._paddle_x, self._paddle_width)
+            self._ball.followPaddle(self._paddle_x, self._paddle_width)
 
             return True
 
@@ -894,10 +967,13 @@ class GameController(QObject):
             self._reset_active_rewards()
         elif reward_type == REWARD_TYPE_LASER:
             self._set_laser_active(True)
+        elif reward_type == REWARD_TYPE_MAGNET:
+            self._set_magnet_active(True)
         elif reward_type == REWARD_TYPE_SKULL:
             self._state.gameStatus = GameStatus.GAME_OVER
             self._state.message = MESSAGE_GAME_OVER
             self._set_laser_active(False)
+            self._set_magnet_active(False)
 
     def _set_laser_active(self, active):
         if self._laser_active == active:
@@ -907,16 +983,33 @@ class GameController(QObject):
         if not active:
             self._laser_model.clear()
 
+    def _set_magnet_active(self, active):
+        if self._magnet_active == active:
+            return
+        if not active:
+            self._ball.release_from_magnet(self._paddle_width)
+        self._magnet_active = active
+        self.magnetActiveChanged.emit(active)
+
     def _reset_active_rewards(self):
         """清除所有已接取并持续生效的奖励 / Reset all active collected rewards."""
         self._ball.deactivate_fireball()
         self._set_laser_active(False)
+        self._set_magnet_active(False)
         self._set_paddle_width(PADDLE_WIDTH)
 
     @Slot()
     def fireLaser(self):
         if self._laser_active and self._state.gameStatus == GameStatus.PLAYING:
             self._laser_model.fire(self._paddle_x, self._paddle_y, self._paddle_width)
+
+    @Slot()
+    def handlePrimaryAction(self):
+        """释放吸附球；若没有吸附球，则保留鼠标发射激光的行为。"""
+        if self._state.gameStatus != GameStatus.PLAYING:
+            return
+        if not self._ball.release_from_magnet(self._paddle_width):
+            self.fireLaser()
 
     def _update_paddle(self, delta_time):
         """按当前方向状态更新挡板 / Update paddle from current direction state."""
@@ -1080,7 +1173,8 @@ class GameController(QObject):
             self._ball.checkPaddleCollision(
                 self._paddle_x,
                 self._paddle_y,
-                self._paddle_width
+                self._paddle_width,
+                self._magnet_active,
             )
             self._check_brick_collisions()
 

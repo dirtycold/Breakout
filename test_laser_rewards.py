@@ -19,6 +19,7 @@ from constants import (
     REWARD_TYPE_EXTEND_PADDLE,
     REWARD_TYPE_FIREBALL,
     REWARD_TYPE_LASER,
+    REWARD_TYPE_MAGNET,
     REWARD_TYPE_RESET,
     REWARD_TYPE_SKULL,
     SCORE_PER_BRICK,
@@ -87,7 +88,11 @@ class LaserRewardTests(unittest.TestCase):
             "clamp_paddle_to_screen",
             "fire_lasers",
             "reset_active_rewards",
+            "release_magnet_ball",
             "resize_paddle",
+            "set_magnet_active",
+            "update_attached_ball",
+            "update_magnet_effect",
             "update_laser_guns",
         ):
             setattr(game, method_name, MethodType(getattr(BreakoutGame, method_name), game))
@@ -104,17 +109,23 @@ class LaserRewardTests(unittest.TestCase):
             ))
         game.laser_bullet_list = arcade.SpriteList()
         game.laser_active = False
+        game.magnet_active = False
+        game.magnet_attached = False
+        game.magnet_effect = None
         game.game_status = GameStatus.PLAYING
 
         game.apply_reward(REWARD_TYPE_FIREBALL)
         game.apply_reward(REWARD_TYPE_EXTEND_PADDLE)
         game.apply_reward(REWARD_TYPE_LASER)
+        game.apply_reward(REWARD_TYPE_MAGNET)
         game.fire_lasers()
         self.assertEqual(len(game.laser_bullet_list), 2)
+        self.assertTrue(game.magnet_active)
 
         game.apply_reward(REWARD_TYPE_RESET)
         self.assertFalse(game.ball.fireball_active)
         self.assertFalse(game.laser_active)
+        self.assertFalse(game.magnet_active)
         self.assertEqual(game.paddle.width, PADDLE_WIDTH)
         self.assertEqual(len(game.laser_bullet_list), 0)
 

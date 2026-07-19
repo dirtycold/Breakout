@@ -299,6 +299,22 @@ class GameConfigProvider(QObject):
     def laserBulletColor(self):
         return LASER_BULLET_COLOR_HEX
 
+    @Property(int, constant=True)
+    def magnetEffectWidth(self):
+        return MAGNET_EFFECT_WIDTH
+
+    @Property(int, constant=True)
+    def magnetEffectHeight(self):
+        return MAGNET_EFFECT_HEIGHT
+
+    @Property(int, constant=True)
+    def magnetEffectFrameCount(self):
+        return MAGNET_EFFECT_FRAME_COUNT
+
+    @Property(int, constant=True)
+    def magnetEffectFrameIntervalMs(self):
+        return round(MAGNET_EFFECT_FRAME_DURATION * 1000)
+
     @Slot(int, result=int)
     def bricksInRow(self, row):
         return bricks_in_row(row)

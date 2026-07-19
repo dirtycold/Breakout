@@ -78,6 +78,7 @@ from PIL import Image, ImageDraw
 from ball_texture import RainbowBallMotion, create_rainbow_ball_image
 from constants import *
 from fireball_effect import inside_fireball_impact_area
+from magnet_visual import create_magnet_effect_frames
 from paddle_texture import create_paddle_image
 from reward_visual import (
     choose_reward_type,
@@ -143,6 +144,37 @@ class RewardSprite(arcade.Sprite):
         self.gravity = motion.gravity
         self.angle = motion.angle
         self.angular_velocity = motion.angular_velocity
+
+
+class MagnetEffectSprite(arcade.Sprite):
+    """Animated electric field displayed while the ball is attached."""
+
+    _texture_frames = None
+
+    def __init__(self):
+        super().__init__()
+        if self.__class__._texture_frames is None:
+            self.__class__._texture_frames = [
+                arcade.Texture(
+                    image=image,
+                    name=f"magnet_effect_{frame_index}",
+                )
+                for frame_index, image in enumerate(create_magnet_effect_frames())
+            ]
+        self._frame_index = 0
+        self._elapsed = 0.0
+        self.texture = self._texture_frames[0]
+        self.width = MAGNET_EFFECT_WIDTH
+        self.height = MAGNET_EFFECT_HEIGHT
+
+    def update_animation(self, delta_time=FIXED_DELTA_TIME):
+        self._elapsed += delta_time
+        next_frame = int(
+            self._elapsed / MAGNET_EFFECT_FRAME_DURATION
+        ) % len(self._texture_frames)
+        if next_frame != self._frame_index:
+            self._frame_index = next_frame
+            self.texture = self._texture_frames[next_frame]
 
 
 class RoundedRectBrick(arcade.Sprite):
@@ -288,7 +320,13 @@ class BreakoutGame(arcade.Window):
         self.reward_list = None
         self.laser_bullet_list = None
         self.laser_gun_list = None
+        self.magnet_effect_list = None
+        self.magnet_effect = None
         self.laser_active = False
+        self.magnet_active = False
+        self.magnet_attached = False
+        self.magnet_offset = 0.0
+        self.magnet_speed = BALL_SPEED
 
         # 移动标志 / Movement flags
         self.left_pressed = False
@@ -347,6 +385,9 @@ class BreakoutGame(arcade.Window):
         self.reward_list = arcade.SpriteList()
         self.laser_bullet_list = arcade.SpriteList()
         self.laser_gun_list = arcade.SpriteList()
+        self.magnet_effect_list = arcade.SpriteList()
+        self.magnet_effect = MagnetEffectSprite()
+        self.magnet_effect_list.append(self.magnet_effect)
         for _ in range(2):
             self.laser_gun_list.append(arcade.SpriteSolidColor(
                 LASER_GUN_WIDTH,
@@ -354,7 +395,12 @@ class BreakoutGame(arcade.Window):
                 color=LASER_GUN_COLOR,
             ))
         self.laser_active = False
+        self.magnet_active = False
+        self.magnet_attached = False
+        self.magnet_offset = 0.0
+        self.magnet_speed = BALL_SPEED
         self.update_laser_guns()
+        self.update_magnet_effect()
 
         # 重置游戏状态 / Reset game state
         self.score = 0
@@ -373,6 +419,8 @@ class BreakoutGame(arcade.Window):
         self.paddle_list.draw()
         if self.laser_active:
             self.laser_gun_list.draw()
+        if self.magnet_attached:
+            self.magnet_effect_list.draw()
         self.laser_bullet_list.draw()
 
         # 绘制奖励物件 / Draw rewards
@@ -513,6 +561,7 @@ class BreakoutGame(arcade.Window):
 
         # 限制挡板在屏幕内 / Keep paddle on screen
         self.clamp_paddle_to_screen()
+        self.update_attached_ball()
 
         self.update_rewards(delta_time)
         if self.game_status != GameStatus.PLAYING:
@@ -520,6 +569,13 @@ class BreakoutGame(arcade.Window):
             return
 
         self.update_lasers(delta_time)
+
+        if self.magnet_attached:
+            self.update_attached_ball()
+            self.magnet_effect.update_animation(delta_time)
+            self.ball.update_animation(delta_time)
+            self.update_particles(delta_time)
+            return
 
         # 更新球的位置 / Update ball position
         self.ball.center_x += self.ball.change_x * delta_time
@@ -545,21 +601,24 @@ class BreakoutGame(arcade.Window):
 
         # 球与挡板碰撞 / Ball collision with paddle
         if arcade.check_for_collision(self.ball, self.paddle):
-            # 计算击中挡板的相对位置和旋转 / Calculate relative hit position and spin
-            relative_hit = (self.ball.center_x - self.paddle.center_x) / (self.paddle.width / 2)
-            relative_hit = max(-1, min(1, relative_hit))  # 限制在 -1 到 1 之间
+            if self.magnet_active and self.ball.change_y < 0:
+                self.attach_ball_to_magnet()
+            else:
+                # 计算击中挡板的相对位置和旋转 / Calculate relative hit position and spin
+                relative_hit = (self.ball.center_x - self.paddle.center_x) / (self.paddle.width / 2)
+                relative_hit = max(-1, min(1, relative_hit))  # 限制在 -1 到 1 之间
 
-            # 根据击中位置调整反弹角度 / Adjust bounce angle based on hit position
-            angle = relative_hit * PADDLE_BOUNCE_MAX_ANGLE
-            angle_rad = math.radians(angle)
+                # 根据击中位置调整反弹角度 / Adjust bounce angle based on hit position
+                angle = relative_hit * PADDLE_BOUNCE_MAX_ANGLE
+                angle_rad = math.radians(angle)
 
-            speed = math.sqrt(self.ball.change_x**2 + self.ball.change_y**2)
-            self.ball.change_x = speed * math.sin(angle_rad)
-            self.ball.change_y = abs(speed * math.cos(angle_rad))  # 确保向上
-            self.ball.motion.set_spin_from_paddle_hit(relative_hit)
+                speed = math.sqrt(self.ball.change_x**2 + self.ball.change_y**2)
+                self.ball.change_x = speed * math.sin(angle_rad)
+                self.ball.change_y = abs(speed * math.cos(angle_rad))  # 确保向上
+                self.ball.motion.set_spin_from_paddle_hit(relative_hit)
 
-            # 确保球在挡板上方 / Ensure ball is above paddle
-            self.ball.center_y = self.paddle.center_y + PADDLE_HEIGHT / 2 + BALL_RADIUS
+                # 确保球在挡板上方 / Ensure ball is above paddle
+                self.ball.center_y = self.paddle.center_y + PADDLE_HEIGHT / 2 + BALL_RADIUS
 
         # 球与砖块碰撞 / Ball collision with bricks
         hit_bricks = arcade.check_for_collision_with_list(self.ball, self.brick_list)
@@ -664,17 +723,86 @@ class BreakoutGame(arcade.Window):
         elif reward_type == REWARD_TYPE_LASER:
             self.laser_active = True
             self.update_laser_guns()
+        elif reward_type == REWARD_TYPE_MAGNET:
+            self.set_magnet_active(True)
         elif reward_type == REWARD_TYPE_SKULL:
             self.game_status = GameStatus.GAME_OVER
             self.laser_active = False
             self.laser_bullet_list.clear()
+            self.set_magnet_active(False)
 
     def reset_active_rewards(self):
         """清除所有持续奖励 / Clear all persistent collected rewards."""
         self.ball.deactivate_fireball()
         self.laser_active = False
         self.laser_bullet_list.clear()
+        self.set_magnet_active(False)
         self.resize_paddle(PADDLE_WIDTH)
+
+    def set_magnet_active(self, active):
+        """Enable or clear the persistent magnetic paddle effect."""
+        if not active:
+            self.release_magnet_ball()
+        self.magnet_active = active
+
+    def attach_ball_to_magnet(self):
+        """Capture the descending ball at its actual paddle contact point."""
+        if self.magnet_attached:
+            return False
+        half_range = max(0.0, self.paddle.width / 2 - BALL_RADIUS)
+        self.magnet_offset = max(
+            -half_range,
+            min(half_range, self.ball.center_x - self.paddle.center_x),
+        )
+        self.magnet_speed = max(
+            BALL_SPEED,
+            math.hypot(self.ball.change_x, self.ball.change_y),
+        )
+        self.ball.change_x = 0.0
+        self.ball.change_y = 0.0
+        self.magnet_attached = True
+        self.update_attached_ball()
+        return True
+
+    def release_magnet_ball(self):
+        """Release the captured ball upward using its contact-point angle."""
+        if not getattr(self, "magnet_attached", False):
+            return False
+        half_width = max(BALL_RADIUS, self.paddle.width / 2)
+        relative_hit = max(-1.0, min(1.0, self.magnet_offset / half_width))
+        angle = math.radians(relative_hit * PADDLE_BOUNCE_MAX_ANGLE)
+        self.ball.change_x = self.magnet_speed * math.sin(angle)
+        self.ball.change_y = abs(self.magnet_speed * math.cos(angle))
+        self.ball.motion.set_spin_from_paddle_hit(relative_hit)
+        self.magnet_attached = False
+        return True
+
+    def update_attached_ball(self):
+        """Keep the captured ball and its electric field aligned to the paddle."""
+        if not getattr(self, "magnet_attached", False):
+            return
+        half_range = max(0.0, self.paddle.width / 2 - BALL_RADIUS)
+        self.magnet_offset = max(-half_range, min(half_range, self.magnet_offset))
+        self.ball.center_x = self.paddle.center_x + self.magnet_offset
+        self.ball.center_y = (
+            self.paddle.center_y
+            + PADDLE_HEIGHT / 2
+            + BALL_RADIUS
+            + BALL_PADDLE_GAP
+        )
+        self.update_magnet_effect()
+
+    def update_magnet_effect(self):
+        if not getattr(self, "magnet_effect", None):
+            return
+        ball_x = getattr(self.ball, "center_x", self.paddle.center_x)
+        self.magnet_effect.center_x = ball_x
+        self.magnet_effect.center_y = (
+            self.paddle.center_y
+            + PADDLE_HEIGHT / 2
+            + MAGNET_EFFECT_HEIGHT / 2
+            - 5
+        )
 
     def update_laser_guns(self):
         if not self.laser_gun_list:
@@ -729,6 +857,7 @@ class BreakoutGame(arcade.Window):
         self.paddle.set_paddle_width(new_width)
         self.clamp_paddle_to_screen()
         self.update_laser_guns()
+        self.update_attached_ball()
 
     def clamp_paddle_to_screen(self):
         """根据当前动态宽度限制挡板 / Clamp using the current dynamic width."""
@@ -881,6 +1010,8 @@ class BreakoutGame(arcade.Window):
             if self.game_status == GameStatus.NOT_STARTED:
                 self.start_playing()
             elif self.game_status == GameStatus.PLAYING:
+                if self.release_magnet_ball():
+                    return
                 self.left_pressed = False
                 self.right_pressed = False
                 self.game_status = GameStatus.PAUSED
@@ -915,14 +1046,17 @@ class BreakoutGame(arcade.Window):
             self.ball.center_x = self.paddle.center_x
 
         self.update_laser_guns()
+        self.update_attached_ball()
 
     def on_mouse_press(self, x, y, button, modifiers):
-        """鼠标左键发射双激光 / Fire twin lasers with the left mouse button."""
+        """鼠标左键优先释放吸附球，否则发射双激光 / Release first, otherwise fire."""
         if button == arcade.MOUSE_BUTTON_LEFT:
-            self.fire_lasers()
+            if not self.release_magnet_ball():
+                self.fire_lasers()
 
     def start_playing(self):
         """发射小球并进入游戏 / Launch the ball and enter play."""
+        self.magnet_attached = False
         self.game_status = GameStatus.PLAYING
         angle = math.radians(BALL_START_ANGLE)
         self.ball.change_x = BALL_SPEED * math.cos(angle)

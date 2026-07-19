@@ -15,6 +15,7 @@ from constants import (
     REWARD_WEIGHTS,
     REWARD_TYPE_EXTEND_PADDLE,
     REWARD_TYPE_FIREBALL,
+    REWARD_TYPE_MAGNET,
     REWARD_TYPE_SHRINK_PADDLE,
     REWARD_TYPE_SKULL,
 )
@@ -22,6 +23,7 @@ from reward_visual import (
     choose_reward_type,
     create_fireball_reward_data_url,
     create_fireball_reward_image,
+    create_magnet_reward_image,
     create_paddle_size_reward_image,
     create_reward_data_url,
     create_reward_image,
@@ -106,6 +108,20 @@ class RewardVisualTests(unittest.TestCase):
         )
         for reward_type in REWARD_TYPES:
             self.assertEqual(create_reward_image(reward_type).size, (REWARD_SIZE, REWARD_SIZE))
+
+    def test_magnet_uses_a_positive_hint_and_distinct_horseshoe_icon(self):
+        magnet = create_magnet_reward_image()
+        hint = magnet.getpixel((REWARD_SIZE // 2, 5))
+        left_pole = magnet.getpixel((10, 9))
+        center_gap = magnet.getpixel((REWARD_SIZE // 2, 9))
+
+        self.assertGreater(hint[1], hint[0])
+        self.assertGreater(left_pole[2], left_pole[0])
+        self.assertNotEqual(left_pole, center_gap)
+        self.assertEqual(
+            create_reward_image(REWARD_TYPE_MAGNET).size,
+            (REWARD_SIZE, REWARD_SIZE),
+        )
 
 
 if __name__ == "__main__":
