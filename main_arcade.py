@@ -39,6 +39,8 @@ _force_missing_gstreamer_when_gi_is_incomplete()
 
 import arcade
 
+from app_icon import set_arcade_window_icon
+
 
 def _patch_pyglet_fontconfig_memory_faces():
     """Avoid a fontconfig crash when Pyglet queries memory-backed faces."""
@@ -333,6 +335,7 @@ class BreakoutGame(arcade.Window):
     def __init__(self):
         """初始化游戏 / Initialize the game"""
         super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+        set_arcade_window_icon(self)
 
         # 设置背景色 / Set background color
         arcade.set_background_color(COLOR_BACKGROUND)

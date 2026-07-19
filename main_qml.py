@@ -17,6 +17,8 @@ from qtpy.QtGui import QFontDatabase, QGuiApplication
 from qtpy.QtQml import QQmlApplicationEngine, qmlRegisterType
 from qtpy.QtCore import QObject, Property, Slot
 
+from app_icon import set_qt_application_icon
+
 # 导入游戏逻辑类
 from game_logic_qml import GameState, Ball, GameController, getBrickColors
 from constants import *
@@ -346,6 +348,7 @@ class GameConfigProvider(QObject):
 def main():
     """主程序 / Main Program"""
     app = QGuiApplication(sys.argv)
+    set_qt_application_icon(app)
 
     # 注册 QML 类型
     qmlRegisterType(GameState, 'GameLogic', 1, 0, 'GameState')
