@@ -26,6 +26,50 @@ Window {
         id: gameController
     }
 
+    // Qt maps "Ctrl" to Command and "Meta" to physical Control on macOS.
+    // Window-level shortcuts avoid depending on which game item owns focus.
+    Shortcut {
+        sequences: ["Ctrl+F1", "Meta+F1"]
+        autoRepeat: false
+        onActivated: gameController.handleCheat(1, false)
+    }
+
+    Shortcut {
+        sequences: ["Ctrl+F2", "Meta+F2"]
+        autoRepeat: false
+        onActivated: gameController.handleCheat(2, false)
+    }
+
+    Shortcut {
+        sequences: ["Ctrl+Shift+F2", "Meta+Shift+F2"]
+        autoRepeat: false
+        onActivated: gameController.handleCheat(2, true)
+    }
+
+    Shortcut {
+        sequences: ["Ctrl+F3", "Meta+F3"]
+        autoRepeat: false
+        onActivated: gameController.handleCheat(3, false)
+    }
+
+    Shortcut {
+        sequences: ["Ctrl+Shift+F3", "Meta+Shift+F3"]
+        autoRepeat: false
+        onActivated: gameController.handleCheat(3, true)
+    }
+
+    Shortcut {
+        sequences: ["Ctrl+F4", "Meta+F4"]
+        autoRepeat: false
+        onActivated: gameController.handleCheat(4, false)
+    }
+
+    Shortcut {
+        sequences: ["Ctrl+Shift+F4", "Meta+Shift+F4"]
+        autoRepeat: false
+        onActivated: gameController.handleCheat(4, true)
+    }
+
     Connections {
         target: gameController
 
@@ -45,26 +89,7 @@ Window {
                 return
             }
 
-            var shortcutPressed =
-                (event.modifiers & Qt.ControlModifier) !== 0
-                || (event.modifiers & Qt.MetaModifier) !== 0
-            var shiftPressed =
-                (event.modifiers & Qt.ShiftModifier) !== 0
-            var cheatKey = 0
-            if (event.key === Qt.Key_F1) {
-                cheatKey = 1
-            } else if (event.key === Qt.Key_F2) {
-                cheatKey = 2
-            } else if (event.key === Qt.Key_F3) {
-                cheatKey = 3
-            } else if (event.key === Qt.Key_F4) {
-                cheatKey = 4
-            }
-
-            if (shortcutPressed && cheatKey !== 0) {
-                gameController.handleCheat(cheatKey, shiftPressed)
-                event.accepted = true
-            } else if (event.key === Qt.Key_Space) {
+            if (event.key === Qt.Key_Space) {
                 gameController.handleSpace()
                 event.accepted = true
             } else if (event.key === Qt.Key_Left) {
