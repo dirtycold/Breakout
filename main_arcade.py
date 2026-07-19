@@ -78,7 +78,7 @@ from PIL import Image, ImageDraw
 from ball_texture import RainbowBallMotion, create_rainbow_ball_image
 from constants import *
 from fireball_effect import inside_fireball_impact_area
-from magnet_visual import create_magnet_effect_frames
+from magnet_visual import create_magnet_effect_frames, magnet_effect_layout
 from paddle_texture import create_paddle_image
 from reward_visual import (
     choose_reward_type,
@@ -149,23 +149,50 @@ class RewardSprite(arcade.Sprite):
 class MagnetEffectSprite(arcade.Sprite):
     """Animated electric field displayed while the ball is attached."""
 
-    _texture_frames = None
+    _texture_frame_cache = {}
 
     def __init__(self):
         super().__init__()
-        if self.__class__._texture_frames is None:
-            self.__class__._texture_frames = [
-                arcade.Texture(
-                    image=image,
-                    name=f"magnet_effect_{frame_index}",
-                )
-                for frame_index, image in enumerate(create_magnet_effect_frames())
-            ]
+        self._texture_frames = []
+        self._layout_key = None
         self._frame_index = 0
         self._elapsed = 0.0
-        self.texture = self._texture_frames[0]
+        self.set_layout(magnet_effect_layout(PADDLE_WIDTH, 0))
         self.width = MAGNET_EFFECT_WIDTH
         self.height = MAGNET_EFFECT_HEIGHT
+
+    def set_layout(self, layout):
+        layout_key = (
+            layout.ball_art_offset,
+            layout.electrode_half_gap,
+            layout.side_mount,
+            layout.side_electrode_x,
+        )
+        if layout_key == self._layout_key:
+            return
+        if layout_key not in self._texture_frame_cache:
+            self._texture_frame_cache[layout_key] = [
+                arcade.Texture(
+                    image=image,
+                    name=(
+                        f"magnet_effect_{layout.ball_art_offset}_"
+                        f"{layout.electrode_half_gap}_{layout.side_mount}_"
+                        f"{layout.side_electrode_x}_{frame_index}"
+                    ),
+                )
+                for frame_index, image in enumerate(
+                    create_magnet_effect_frames(
+                        ball_offset=layout.ball_art_offset,
+                        electrode_half_gap=layout.electrode_half_gap,
+                        side_mount=layout.side_mount,
+                        side_electrode_x=layout.side_electrode_x,
+                    )
+                )
+            ]
+        self._texture_frames = self._texture_frame_cache[layout_key]
+        self._layout_key = layout_key
+        self._frame_index %= len(self._texture_frames)
+        self.texture = self._texture_frames[self._frame_index]
 
     def update_animation(self, delta_time=FIXED_DELTA_TIME):
         self._elapsed += delta_time
@@ -795,13 +822,15 @@ class BreakoutGame(arcade.Window):
     def update_magnet_effect(self):
         if not getattr(self, "magnet_effect", None):
             return
-        ball_x = getattr(self.ball, "center_x", self.paddle.center_x)
-        self.magnet_effect.center_x = ball_x
+        ball_offset = self.magnet_offset if self.magnet_attached else 0
+        layout = magnet_effect_layout(self.paddle.width, ball_offset)
+        self.magnet_effect.set_layout(layout)
+        self.magnet_effect.center_x = self.paddle.center_x + layout.center_offset
         self.magnet_effect.center_y = (
             self.paddle.center_y
             + PADDLE_HEIGHT / 2
-            + MAGNET_EFFECT_HEIGHT / 2
-            - 5
+            + MAGNET_EFFECT_DECK_Y
+            - MAGNET_EFFECT_HEIGHT / 2
         )
 
     def update_laser_guns(self):

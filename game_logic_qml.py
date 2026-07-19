@@ -26,7 +26,10 @@ from qtpy.QtCore import (
 from ball_texture import RainbowBallMotion, create_rainbow_ball_data_url
 from constants import *
 from fireball_effect import inside_fireball_impact_area
-from magnet_visual import create_magnet_effect_sprite_sheet_data_url
+from magnet_visual import (
+    create_magnet_effect_sprite_sheet_data_url,
+    magnet_effect_layout,
+)
 from paddle_texture import create_paddle_sprite_sheet_data_url
 from reward_visual import (
     choose_reward_type,
@@ -771,6 +774,7 @@ class GameController(QObject):
     paddleWidthChanged = Signal(float)
     laserActiveChanged = Signal(bool)
     magnetActiveChanged = Signal(bool)
+    magnetEffectVisualChanged = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -787,6 +791,10 @@ class GameController(QObject):
         self._paddle_move_right = False
         self._laser_active = False
         self._magnet_active = False
+        self._magnet_effect_layout = magnet_effect_layout(PADDLE_WIDTH, 0)
+        self._ball.magnetAttachedChanged.connect(
+            lambda _attached: self._update_magnet_effect_visual()
+        )
 
         self._state.brickCount = total_brick_count()
 
@@ -853,9 +861,18 @@ class GameController(QObject):
     def magnetActive(self):
         return self._magnet_active
 
-    @Property(str, constant=True)
+    @Property(str, notify=magnetEffectVisualChanged)
     def magnetEffectTextureSource(self):
-        return create_magnet_effect_sprite_sheet_data_url()
+        return create_magnet_effect_sprite_sheet_data_url(
+            ball_offset=self._magnet_effect_layout.ball_art_offset,
+            electrode_half_gap=self._magnet_effect_layout.electrode_half_gap,
+            side_mount=self._magnet_effect_layout.side_mount,
+            side_electrode_x=self._magnet_effect_layout.side_electrode_x,
+        )
+
+    @Property(float, notify=magnetEffectVisualChanged)
+    def magnetEffectCenterOffset(self):
+        return self._magnet_effect_layout.center_offset
 
     @Slot()
     def startGame(self):
@@ -953,6 +970,7 @@ class GameController(QObject):
         self._paddle_width = new_width
         self.paddleWidthChanged.emit(self._paddle_width)
         self._set_paddle_x(center_x - self._paddle_width / 2, force=True)
+        self._update_magnet_effect_visual()
         return True
 
     def _apply_reward(self, reward_type):
@@ -990,6 +1008,14 @@ class GameController(QObject):
             self._ball.release_from_magnet(self._paddle_width)
         self._magnet_active = active
         self.magnetActiveChanged.emit(active)
+
+    def _update_magnet_effect_visual(self):
+        ball_offset = self._ball._magnet_offset if self._ball.magnetAttached else 0
+        layout = magnet_effect_layout(self._paddle_width, ball_offset)
+        if layout == self._magnet_effect_layout:
+            return
+        self._magnet_effect_layout = layout
+        self.magnetEffectVisualChanged.emit()
 
     def _reset_active_rewards(self):
         """清除所有已接取并持续生效的奖励 / Reset all active collected rewards."""

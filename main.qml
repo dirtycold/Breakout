@@ -217,8 +217,10 @@ Window {
                 visible: gameController.ball.magnetAttached
                 width: config.magnetEffectWidth
                 height: config.magnetEffectHeight
-                x: gameController.ball.x - paddle.x - width / 2
-                y: -(height - 5)
+                x: paddle.width / 2
+                   + gameController.magnetEffectCenterOffset
+                   - width / 2
+                y: -config.magnetEffectDeckY
                 clip: true
 
                 Image {

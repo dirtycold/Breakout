@@ -308,6 +308,10 @@ class GameConfigProvider(QObject):
         return MAGNET_EFFECT_HEIGHT
 
     @Property(int, constant=True)
+    def magnetEffectDeckY(self):
+        return MAGNET_EFFECT_DECK_Y
+
+    @Property(int, constant=True)
     def magnetEffectFrameCount(self):
         return MAGNET_EFFECT_FRAME_COUNT
 

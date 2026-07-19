@@ -8,6 +8,7 @@ from qtpy.QtCore import QCoreApplication
 from constants import (
     BALL_RADIUS,
     BALL_SPEED,
+    MAGNET_EFFECT_DECK_Y,
     MAGNET_EFFECT_FRAME_COUNT,
     MAGNET_EFFECT_HEIGHT,
     MAGNET_EFFECT_WIDTH,
@@ -19,8 +20,11 @@ from constants import (
 )
 from game_logic_qml import GameController
 from magnet_visual import (
+    MAGNET_BALL_OFFSET_QUANTUM,
+    MAGNET_ELECTRODE_GLOW_HALF_WIDTH,
     create_magnet_effect_frames,
     create_magnet_effect_sprite_sheet_data_url,
+    magnet_effect_layout,
 )
 from main_arcade import BreakoutGame, RainbowBall, RoundedRectPaddle
 
@@ -96,6 +100,96 @@ class MagnetRewardTests(unittest.TestCase):
             ball.x,
             self.controller.paddleX + self.controller.paddleWidth / 2,
         )
+
+    def test_electrodes_stay_inside_every_paddle_without_moving_the_ball_target(self):
+        for paddle_width in (20, 40, 70, PADDLE_WIDTH, 250, 400):
+            max_ball_offset = max(0, paddle_width / 2 - BALL_RADIUS)
+            for ball_offset in (-max_ball_offset, 0, max_ball_offset):
+                with self.subTest(
+                    paddle_width=paddle_width,
+                    ball_offset=ball_offset,
+                ):
+                    layout = magnet_effect_layout(paddle_width, ball_offset)
+                    pair_center = paddle_width / 2 + layout.center_offset
+                    left_edge = (
+                        pair_center
+                        - layout.electrode_half_gap
+                        - MAGNET_ELECTRODE_GLOW_HALF_WIDTH
+                    )
+                    right_edge = (
+                        pair_center
+                        + layout.electrode_half_gap
+                        + MAGNET_ELECTRODE_GLOW_HALF_WIDTH
+                    )
+                    self.assertGreaterEqual(
+                        left_edge,
+                        0,
+                    )
+                    self.assertLessEqual(
+                        right_edge,
+                        paddle_width,
+                    )
+
+                    texture_ball_x = pair_center + layout.ball_art_offset
+                    actual_ball_x = paddle_width / 2 + ball_offset
+                    self.assertLessEqual(
+                        abs(texture_ball_x - actual_ball_x),
+                        MAGNET_BALL_OFFSET_QUANTUM / 2,
+                    )
+
+    def test_edge_capture_shifts_only_the_effect_inward(self):
+        ball = self._capture_qml_ball(offset=40)
+        actual_offset = ball.x - (
+            self.controller.paddleX + self.controller.paddleWidth / 2
+        )
+
+        self.assertAlmostEqual(actual_offset, 40)
+        self.assertLess(
+            self.controller.magnetEffectCenterOffset,
+            actual_offset,
+        )
+
+    def test_edge_layout_mounts_the_outer_electrode_on_the_paddle_side(self):
+        center = magnet_effect_layout(PADDLE_WIDTH, 0)
+        left = magnet_effect_layout(PADDLE_WIDTH, -40)
+        right = magnet_effect_layout(PADDLE_WIDTH, 40)
+
+        self.assertEqual(center.side_mount, 0)
+        self.assertEqual(left.side_mount, -1)
+        self.assertEqual(right.side_mount, 1)
+
+        left_effect_global_x = (
+            PADDLE_WIDTH / 2
+            + left.center_offset
+            - MAGNET_EFFECT_WIDTH / 2
+        )
+        right_effect_global_x = (
+            PADDLE_WIDTH / 2
+            + right.center_offset
+            - MAGNET_EFFECT_WIDTH / 2
+        )
+        self.assertAlmostEqual(
+            left_effect_global_x + left.side_electrode_x,
+            0,
+        )
+        self.assertAlmostEqual(
+            right_effect_global_x + right.side_electrode_x,
+            PADDLE_WIDTH,
+        )
+
+        left_frame = create_magnet_effect_frames(
+            ball_offset=left.ball_art_offset,
+            electrode_half_gap=left.electrode_half_gap,
+            side_mount=left.side_mount,
+            side_electrode_x=left.side_electrode_x,
+        )[0]
+        side_pixel = left_frame.getpixel(
+            (
+                round(left.side_electrode_x + 3),
+                MAGNET_EFFECT_DECK_Y + 7,
+            )
+        )
+        self.assertGreater(side_pixel[3], 0)
 
     def test_reset_reward_clears_magnet_and_safely_releases_ball(self):
         ball = self._capture_qml_ball()
