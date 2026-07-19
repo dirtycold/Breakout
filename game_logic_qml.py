@@ -1024,6 +1024,22 @@ class GameController(QObject):
         self._set_magnet_active(False)
         self._set_paddle_width(PADDLE_WIDTH)
 
+    @Slot(int, bool, result=bool)
+    def handleCheat(self, function_key, reverse):
+        """处理 Ctrl/Cmd+F1..F4 奖励秘籍 / Handle reward cheat shortcuts."""
+        if function_key == 1:
+            self._reset_active_rewards()
+        elif function_key == 2:
+            step = -PADDLE_REWARD_SIZE_STEP if reverse else PADDLE_REWARD_SIZE_STEP
+            self._set_paddle_width(self._paddle_width + step)
+        elif function_key == 3:
+            self._set_laser_active(not reverse)
+        elif function_key == 4:
+            self._set_magnet_active(not reverse)
+        else:
+            return False
+        return True
+
     @Slot()
     def fireLaser(self):
         if self._laser_active and self._state.gameStatus == GameStatus.PLAYING:

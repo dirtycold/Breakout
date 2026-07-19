@@ -1025,8 +1025,36 @@ class BreakoutGame(arcade.Window):
         for particle in particles_to_remove:
             particle.remove_from_sprite_lists()
 
+    def handle_cheat(self, key, modifiers):
+        """处理 Ctrl/Cmd+F1..F4 奖励秘籍 / Handle reward cheat shortcuts."""
+        modifiers = modifiers or 0
+        shortcut_modifiers = arcade.key.MOD_CTRL | arcade.key.MOD_COMMAND
+        if not modifiers & shortcut_modifiers:
+            return False
+
+        reverse = bool(modifiers & arcade.key.MOD_SHIFT)
+        if key == arcade.key.F1:
+            self.reset_active_rewards()
+        elif key == arcade.key.F2:
+            step = -PADDLE_REWARD_SIZE_STEP if reverse else PADDLE_REWARD_SIZE_STEP
+            self.resize_paddle(self.paddle.width + step)
+        elif key == arcade.key.F3:
+            self.laser_active = not reverse
+            if self.laser_active:
+                self.update_laser_guns()
+            else:
+                self.laser_bullet_list.clear()
+        elif key == arcade.key.F4:
+            self.set_magnet_active(not reverse)
+        else:
+            return False
+        return True
+
     def on_key_press(self, key, modifiers):
         """按键按下事件 / Key press event"""
+
+        if self.handle_cheat(key, modifiers):
+            return
 
         if key == arcade.key.LEFT:
             self.left_pressed = True

@@ -54,6 +54,7 @@ class GameStateTests(unittest.TestCase):
         game.space_pressed = False
         game.ball = SimpleNamespace(change_x=0.0, change_y=0.0)
         game.start_playing = MethodType(BreakoutGame.start_playing, game)
+        game.handle_cheat = MethodType(BreakoutGame.handle_cheat, game)
         game.on_key_press = MethodType(BreakoutGame.on_key_press, game)
         game.release_magnet_ball = MethodType(BreakoutGame.release_magnet_ball, game)
         game.magnet_attached = False

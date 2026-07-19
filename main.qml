@@ -45,7 +45,26 @@ Window {
                 return
             }
 
-            if (event.key === Qt.Key_Space) {
+            var shortcutPressed =
+                (event.modifiers & Qt.ControlModifier) !== 0
+                || (event.modifiers & Qt.MetaModifier) !== 0
+            var shiftPressed =
+                (event.modifiers & Qt.ShiftModifier) !== 0
+            var cheatKey = 0
+            if (event.key === Qt.Key_F1) {
+                cheatKey = 1
+            } else if (event.key === Qt.Key_F2) {
+                cheatKey = 2
+            } else if (event.key === Qt.Key_F3) {
+                cheatKey = 3
+            } else if (event.key === Qt.Key_F4) {
+                cheatKey = 4
+            }
+
+            if (shortcutPressed && cheatKey !== 0) {
+                gameController.handleCheat(cheatKey, shiftPressed)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Space) {
                 gameController.handleSpace()
                 event.accepted = true
             } else if (event.key === Qt.Key_Left) {

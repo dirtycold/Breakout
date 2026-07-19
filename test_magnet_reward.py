@@ -207,6 +207,7 @@ class MagnetRewardTests(unittest.TestCase):
         game = ArcadeGameHarness()
         for method_name in (
             "attach_ball_to_magnet",
+            "handle_cheat",
             "on_key_press",
             "on_mouse_press",
             "release_magnet_ball",
