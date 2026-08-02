@@ -1,6 +1,7 @@
 import math
 import unittest
 from types import MethodType, SimpleNamespace
+from unittest.mock import patch
 
 import arcade
 from qtpy.QtCore import QCoreApplication
@@ -157,6 +158,32 @@ class GameStateTests(unittest.TestCase):
         self.assertFalse(game.magnet_active)
         self.assertFalse(game.magnet_attached)
         self.assertEqual((game.ball.change_x, game.ball.change_y), (0.0, 0.0))
+
+    def test_arcade_requests_focus_again_after_the_event_loop_starts(self):
+        class ArcadeGameHarness:
+            pass
+
+        game = ArcadeGameHarness()
+        game.request_startup_focus = MethodType(
+            BreakoutGame.request_startup_focus,
+            game,
+        )
+        game._retry_startup_focus = MethodType(
+            BreakoutGame._retry_startup_focus,
+            game,
+        )
+        activations = []
+        game.activate = lambda: activations.append(True)
+
+        with patch("main_arcade.arcade.schedule_once") as schedule_once:
+            game.request_startup_focus()
+
+            self.assertEqual(activations, [True])
+            callback, delay = schedule_once.call_args.args
+            self.assertEqual(delay, 0.1)
+            callback(delay)
+
+        self.assertEqual(activations, [True, True])
 
 
 if __name__ == "__main__":

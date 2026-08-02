@@ -440,6 +440,15 @@ class BreakoutGame(arcade.Window):
         self.left_pressed = False
         self.right_pressed = False
 
+    def request_startup_focus(self):
+        """Activate now and once more after the event loop starts."""
+        self.activate()
+        arcade.schedule_once(self._retry_startup_focus, 0.1)
+
+    def _retry_startup_focus(self, _delta_time):
+        """Win the short startup race with the launching terminal on macOS."""
+        self.activate()
+
     def on_draw(self):
         """绘制游戏画面 / Draw the game screen"""
         self.clear()
@@ -1153,6 +1162,7 @@ def main():
     """主函数 / Main function"""
     game = BreakoutGame()
     game.setup()
+    game.request_startup_focus()
     arcade.run()
 
 
