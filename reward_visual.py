@@ -155,15 +155,43 @@ def create_reset_reward_image(size=REWARD_SIZE):
         border=(*REWARD_NEUTRAL_BORDER_COLOR, 255),
     )
     accent = (226, 232, 240, 255)
+    center = 19
+    radius = 11
+    end_angle = 300
     draw.arc(
         (8 * scale, 8 * scale, 30 * scale, 30 * scale),
-        start=35,
-        end=325,
+        start=30,
+        end=end_angle,
         fill=accent,
         width=4 * scale,
     )
+
+    # Continue the circular stroke with an arrowhead aligned to its tangent.
+    angle = math.radians(end_angle)
+    anchor_x = center + radius * math.cos(angle)
+    anchor_y = center + radius * math.sin(angle)
+    tangent_x = -math.sin(angle)
+    tangent_y = math.cos(angle)
+    normal_x = -tangent_y
+    normal_y = tangent_x
+    tip = (
+        (anchor_x + tangent_x * 6) * scale,
+        (anchor_y + tangent_y * 6) * scale,
+    )
+    base_x = anchor_x - tangent_x * 1.5
+    base_y = anchor_y - tangent_y * 1.5
     draw.polygon(
-        ((27 * scale, 5 * scale), (34 * scale, 9 * scale), (27 * scale, 14 * scale)),
+        (
+            tip,
+            (
+                (base_x + normal_x * 3.8) * scale,
+                (base_y + normal_y * 3.8) * scale,
+            ),
+            (
+                (base_x - normal_x * 3.8) * scale,
+                (base_y - normal_y * 3.8) * scale,
+            ),
+        ),
         fill=accent,
     )
     return image.resize((size, size), Image.Resampling.LANCZOS)
@@ -245,6 +273,45 @@ def create_magnet_reward_image(size=REWARD_SIZE):
 
 
 @lru_cache(maxsize=4)
+def create_slow_ball_reward_image(size=REWARD_SIZE):
+    """Draw a chilled ball that communicates a return to minimum speed."""
+    image, draw, scale = _create_reward_canvas(
+        size,
+        background=(*REWARD_FIREBALL_COLOR, 246),
+        border=(*REWARD_FIREBALL_BORDER_COLOR, 255),
+    )
+
+    trail = (125, 211, 252, 230)
+    for y, start_x in ((13, 7), (19, 4), (25, 8)):
+        draw.rounded_rectangle(
+            (start_x * scale, (y - 1) * scale, 16 * scale, (y + 1) * scale),
+            radius=scale,
+            fill=trail,
+        )
+
+    ball_fill = (14, 165, 233, 255)
+    frost = (240, 249, 255, 255)
+    draw.ellipse(
+        (13 * scale, 9 * scale, 32 * scale, 28 * scale),
+        fill=ball_fill,
+        outline=frost,
+        width=2 * scale,
+    )
+
+    center_x, center_y = 22.5, 18.5
+    snowflake_lines = (
+        (17, center_y, 28, center_y),
+        (center_x, 13, center_x, 24),
+        (18.5, 14.5, 26.5, 22.5),
+        (26.5, 14.5, 18.5, 22.5),
+    )
+    for line in snowflake_lines:
+        draw.line(tuple(value * scale for value in line), fill=frost, width=1 * scale)
+
+    return image.resize((size, size), Image.Resampling.LANCZOS)
+
+
+@lru_cache(maxsize=4)
 def create_skull_reward_image(size=REWARD_SIZE):
     """Draw a compact white skull on a negative red hint."""
     image, draw, scale = _create_reward_canvas(
@@ -267,7 +334,7 @@ def create_skull_reward_image(size=REWARD_SIZE):
     return image.resize((size, size), Image.Resampling.LANCZOS)
 
 
-@lru_cache(maxsize=12)
+@lru_cache(maxsize=16)
 def create_reward_image(reward_type, size=REWARD_SIZE):
     if reward_type == REWARD_TYPE_FIREBALL:
         return create_fireball_reward_image(size)
@@ -279,12 +346,14 @@ def create_reward_image(reward_type, size=REWARD_SIZE):
         return create_laser_reward_image(size)
     if reward_type == REWARD_TYPE_MAGNET:
         return create_magnet_reward_image(size)
+    if reward_type == REWARD_TYPE_SLOW_BALL:
+        return create_slow_ball_reward_image(size)
     if reward_type == REWARD_TYPE_SKULL:
         return create_skull_reward_image(size)
     raise ValueError(f"Unsupported reward type: {reward_type}")
 
 
-@lru_cache(maxsize=12)
+@lru_cache(maxsize=16)
 def create_reward_data_url(reward_type, size=REWARD_SIZE):
     """Return generated reward artwork as an embeddable PNG URL."""
     output = BytesIO()

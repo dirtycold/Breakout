@@ -23,6 +23,7 @@ from qtpy.QtCore import (
     Slot,
 )
 
+from ball_speed import accelerate_ball_velocity, reset_ball_velocity
 from ball_texture import RainbowBallMotion, create_rainbow_ball_data_url
 from constants import *
 from fireball_effect import inside_fireball_impact_area
@@ -629,6 +630,12 @@ class Ball(QObject):
         if not self._active or self._magnet_attached:
             return
 
+        self._dx, self._dy = accelerate_ball_velocity(
+            self._dx,
+            self._dy,
+            delta_time,
+        )
+
         # 更新位置（乘以 delta_time 控制速度）
         self._x += self._dx * delta_time
         self._y += self._dy * delta_time
@@ -720,6 +727,13 @@ class Ball(QObject):
         self._dx = 0.0
         self._dy = 0.0
         self._set_magnet_attached(False)
+
+    def reset_speed(self):
+        """Restore minimum speed now or for the next magnetic release."""
+        if self._magnet_attached:
+            self._magnet_speed = BALL_SPEED
+            return
+        self._dx, self._dy = reset_ball_velocity(self._dx, self._dy)
 
     def activate_fireball(self):
         """激活火球效果 / Activate fireball effect."""
@@ -1006,6 +1020,8 @@ class GameController(QObject):
             self._set_laser_active(True)
         elif reward_type == REWARD_TYPE_MAGNET:
             self._set_magnet_active(True)
+        elif reward_type == REWARD_TYPE_SLOW_BALL:
+            self._ball.reset_speed()
         elif reward_type == REWARD_TYPE_SKULL:
             self._finish_game(GameStatus.GAME_OVER, MESSAGE_GAME_OVER)
 

@@ -77,6 +77,7 @@ def _patch_pyglet_fontconfig_memory_faces():
 _patch_pyglet_fontconfig_memory_faces()
 
 from PIL import Image, ImageDraw
+from ball_speed import accelerate_ball_velocity, reset_ball_velocity
 from ball_texture import RainbowBallMotion, create_rainbow_ball_image
 from constants import *
 from fireball_effect import inside_fireball_impact_area
@@ -606,6 +607,13 @@ class BreakoutGame(arcade.Window):
             self.update_particles(delta_time)
             return
 
+        # 轻微提升运行速度，并在可玩上限处截断 / Apply the capped tempo ramp
+        self.ball.change_x, self.ball.change_y = accelerate_ball_velocity(
+            self.ball.change_x,
+            self.ball.change_y,
+            delta_time,
+        )
+
         # 更新球的位置 / Update ball position
         self.ball.center_x += self.ball.change_x * delta_time
         self.ball.center_y += self.ball.change_y * delta_time
@@ -754,8 +762,20 @@ class BreakoutGame(arcade.Window):
             self.update_laser_guns()
         elif reward_type == REWARD_TYPE_MAGNET:
             self.set_magnet_active(True)
+        elif reward_type == REWARD_TYPE_SLOW_BALL:
+            self.reset_ball_speed()
         elif reward_type == REWARD_TYPE_SKULL:
             self.finish_game(GameStatus.GAME_OVER)
+
+    def reset_ball_speed(self):
+        """Restore the minimum speed without changing the ball's direction."""
+        if self.magnet_attached:
+            self.magnet_speed = BALL_SPEED
+            return
+        self.ball.change_x, self.ball.change_y = reset_ball_velocity(
+            self.ball.change_x,
+            self.ball.change_y,
+        )
 
     def reset_active_rewards(self):
         """清除所有持续奖励 / Clear all persistent collected rewards."""

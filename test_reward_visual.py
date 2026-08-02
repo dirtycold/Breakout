@@ -16,6 +16,7 @@ from constants import (
     REWARD_TYPE_EXTEND_PADDLE,
     REWARD_TYPE_FIREBALL,
     REWARD_TYPE_MAGNET,
+    REWARD_TYPE_SLOW_BALL,
     REWARD_TYPE_SHRINK_PADDLE,
     REWARD_TYPE_SKULL,
 )
@@ -28,6 +29,8 @@ from reward_visual import (
     create_reward_data_url,
     create_reward_image,
     create_reward_motion,
+    create_reset_reward_image,
+    create_slow_ball_reward_image,
 )
 
 
@@ -122,6 +125,28 @@ class RewardVisualTests(unittest.TestCase):
             create_reward_image(REWARD_TYPE_MAGNET).size,
             (REWARD_SIZE, REWARD_SIZE),
         )
+
+    def test_slow_ball_has_a_positive_hint_and_chilled_ball_icon(self):
+        slow_ball = create_slow_ball_reward_image()
+        hint = slow_ball.getpixel((REWARD_SIZE // 2, 5))
+        ball_edge = slow_ball.getpixel((14, 18))
+        snowflake = slow_ball.getpixel((22, 18))
+
+        self.assertGreater(hint[1], hint[0])
+        self.assertGreater(ball_edge[2], ball_edge[0])
+        self.assertGreater(min(snowflake[:3]), 200)
+        self.assertEqual(
+            create_reward_image(REWARD_TYPE_SLOW_BALL).size,
+            (REWARD_SIZE, REWARD_SIZE),
+        )
+
+    def test_reset_arrow_continues_around_its_circular_stroke(self):
+        reset = create_reset_reward_image()
+        diagonal_tip = reset.getpixel((28, 11))
+        disconnected_old_tip = reset.getpixel((34, 9))
+
+        self.assertGreater(min(diagonal_tip[:3]), 200)
+        self.assertLess(max(disconnected_old_tip[:3]), min(diagonal_tip[:3]))
 
 
 if __name__ == "__main__":
