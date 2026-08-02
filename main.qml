@@ -10,6 +10,9 @@ Window {
     title: config.screenTitleQml
     color: config.backgroundColor
     property real paddleVisualX: (width - config.paddleWidth) / 2
+    property bool playObjectsVisible:
+        gameController.state.gameStatus !== gameStatus.GAME_OVER
+        && gameController.state.gameStatus !== gameStatus.VICTORY
 
     // 游戏配置（从 Python constants 读取）
     GameConfigProvider {
@@ -165,6 +168,7 @@ Window {
         Item {
             id: rewardContainer
             anchors.fill: parent
+            visible: root.playObjectsVisible
 
             Repeater {
                 model: gameController.rewardModel
@@ -190,6 +194,7 @@ Window {
         Item {
             id: laserBulletContainer
             anchors.fill: parent
+            visible: root.playObjectsVisible
 
             Repeater {
                 model: gameController.laserModel
@@ -213,6 +218,7 @@ Window {
             radius: config.paddleCornerRadius
             x: root.paddleVisualX
             y: config.paddleY
+            visible: root.playObjectsVisible
 
             property real gradientOffset: 0
             property int frameIndex: 0
@@ -296,7 +302,8 @@ Window {
 
             Timer {
                 running: gameController.ball.magnetAttached
-                         && gameController.state.gameStatus === gameStatus.PLAYING
+                         && root.playObjectsVisible
+                         && gameController.state.gameStatus !== gameStatus.PAUSED
                 repeat: true
                 interval: config.magnetEffectFrameIntervalMs
                 onTriggered: {
@@ -313,6 +320,7 @@ Window {
             height: config.ballDiameter
             x: gameController && gameController.ball ? gameController.ball.x - config.ballRadius : paddle.x + paddle.width / 2 - config.ballRadius
             y: gameController && gameController.ball ? gameController.ball.y - config.ballRadius : config.ballStartCenterY - config.ballRadius
+            visible: root.playObjectsVisible
 
             Image {
                 anchors.fill: parent

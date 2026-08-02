@@ -426,9 +426,10 @@ class BreakoutGame(arcade.Window):
             ))
         self.laser_active = False
         self.magnet_active = False
-        self.magnet_attached = False
+        self.magnet_attached = True
         self.magnet_offset = 0.0
         self.magnet_speed = BALL_SPEED
+        self.update_attached_ball()
         self.update_laser_guns()
         self.update_magnet_effect()
 
@@ -445,19 +446,16 @@ class BreakoutGame(arcade.Window):
         # 绘制砖块 / Draw bricks
         self.brick_list.draw()
 
-        # 绘制挡板 / Draw paddle
-        self.paddle_list.draw()
-        if self.laser_active:
-            self.laser_gun_list.draw()
-        if self.magnet_attached:
-            self.magnet_effect_list.draw()
-        self.laser_bullet_list.draw()
-
-        # 绘制奖励物件 / Draw rewards
-        self.reward_list.draw()
-
-        # 绘制球 / Draw ball
-        self.ball_list.draw()
+        if self.game_status not in (GameStatus.GAME_OVER, GameStatus.VICTORY):
+            # 绘制挡板、奖励和球 / Draw active play objects
+            self.paddle_list.draw()
+            if self.laser_active:
+                self.laser_gun_list.draw()
+            if self.magnet_attached:
+                self.magnet_effect_list.draw()
+            self.laser_bullet_list.draw()
+            self.reward_list.draw()
+            self.ball_list.draw()
 
         # 绘制粒子效果 / Draw particle effects
         self.particle_list.draw()
@@ -578,8 +576,9 @@ class BreakoutGame(arcade.Window):
             # 限制挡板在屏幕内 / Keep paddle on screen
             self.clamp_paddle_to_screen()
 
-            # 球跟随挡板移动 / Ball follows paddle
-            self.ball.center_x = self.paddle.center_x
+            # 待发小球以临时磁力效果跟随挡板 / Hold the waiting ball magnetically
+            self.update_attached_ball()
+            self.magnet_effect.update_animation(delta_time)
             self.ball.update_animation(delta_time)
             return
 
@@ -626,7 +625,7 @@ class BreakoutGame(arcade.Window):
 
         # 球掉落（游戏结束）/ Ball falls (game over)
         if self.ball.center_y - BALL_RADIUS <= 0:
-            self.game_status = GameStatus.GAME_OVER
+            self.finish_game(GameStatus.GAME_OVER)
             return
 
         # 球与挡板碰撞 / Ball collision with paddle
@@ -715,7 +714,7 @@ class BreakoutGame(arcade.Window):
         rewards_to_remove = []
         paddle_bottom = self.paddle.center_y - PADDLE_HEIGHT / 2
 
-        for reward in self.reward_list:
+        for reward in list(self.reward_list):
             reward.center_x += reward.change_x * delta_time
             reward.center_y += reward.change_y * delta_time
             reward.change_y -= reward.gravity * delta_time
@@ -756,10 +755,7 @@ class BreakoutGame(arcade.Window):
         elif reward_type == REWARD_TYPE_MAGNET:
             self.set_magnet_active(True)
         elif reward_type == REWARD_TYPE_SKULL:
-            self.game_status = GameStatus.GAME_OVER
-            self.laser_active = False
-            self.laser_bullet_list.clear()
-            self.set_magnet_active(False)
+            self.finish_game(GameStatus.GAME_OVER)
 
     def reset_active_rewards(self):
         """清除所有持续奖励 / Clear all persistent collected rewards."""
@@ -771,9 +767,20 @@ class BreakoutGame(arcade.Window):
 
     def set_magnet_active(self, active):
         """Enable or clear the persistent magnetic paddle effect."""
-        if not active:
+        if not active and self.game_status == GameStatus.PLAYING:
             self.release_magnet_ball()
         self.magnet_active = active
+
+    def finish_game(self, status):
+        """Enter a terminal state and remove active play objects."""
+        self.game_status = status
+        self.reward_list.clear()
+        self.laser_bullet_list.clear()
+        self.laser_active = False
+        self.magnet_active = False
+        self.magnet_attached = False
+        self.ball.change_x = 0.0
+        self.ball.change_y = 0.0
 
     def attach_ball_to_magnet(self):
         """Capture the descending ball at its actual paddle contact point."""
@@ -881,7 +888,7 @@ class BreakoutGame(arcade.Window):
         for bullet in bullets_to_remove:
             bullet.remove_from_sprite_lists()
         if len(self.brick_list) == 0:
-            self.game_status = GameStatus.VICTORY
+            self.finish_game(GameStatus.VICTORY)
 
     def resize_paddle(self, width):
         """调整挡板宽度并保持中心位置 / Resize paddle around its center."""
@@ -920,7 +927,7 @@ class BreakoutGame(arcade.Window):
             self.spawn_reward(brick_x, brick_y, direction_x)
 
         if len(self.brick_list) == 0:
-            self.game_status = GameStatus.VICTORY
+            self.finish_game(GameStatus.VICTORY)
 
     def bricks_in_fireball_path(self, source_brick, direction_x, direction_y):
         """返回撞击砖块运动方向一侧的 2x2 局部砖块 / Return the directional local 2x2 area."""
@@ -1067,9 +1074,7 @@ class BreakoutGame(arcade.Window):
             if self.space_pressed:
                 return
             self.space_pressed = True
-            if self.game_status == GameStatus.NOT_STARTED:
-                self.start_playing()
-            elif self.game_status == GameStatus.PLAYING:
+            if self.game_status == GameStatus.PLAYING:
                 if self.release_magnet_ball():
                     return
                 self.left_pressed = False
@@ -1079,7 +1084,6 @@ class BreakoutGame(arcade.Window):
                 self.game_status = GameStatus.PLAYING
             elif self.game_status in (GameStatus.GAME_OVER, GameStatus.VICTORY):
                 self.setup()
-                self.start_playing()
 
     def on_key_release(self, key, modifiers):
         """按键释放事件 / Key release event"""
@@ -1111,7 +1115,9 @@ class BreakoutGame(arcade.Window):
     def on_mouse_press(self, x, y, button, modifiers):
         """鼠标左键优先释放吸附球，否则发射双激光 / Release first, otherwise fire."""
         if button == arcade.MOUSE_BUTTON_LEFT:
-            if not self.release_magnet_ball():
+            if self.game_status == GameStatus.NOT_STARTED:
+                self.start_playing()
+            elif not self.release_magnet_ball():
                 self.fire_lasers()
 
     def start_playing(self):

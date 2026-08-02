@@ -31,9 +31,9 @@ SCREEN_TITLE_QML = "DX-Ball Clone (QML版) - 打砖块游戏"
 # 文案设置 / Text Settings
 SCORE_LABEL = "分数 Score"
 MESSAGE_START_LINES = (
-    "按空格键开始游戏",
-    "Press SPACE to Start",
-    "← → 移动挡板 / Move Paddle",
+    "点击鼠标左键发球",
+    "Left-click to Launch",
+    "鼠标 / ← → 移动挡板 / Move Paddle",
 )
 MESSAGE_GAME_OVER_LINES = (
     "游戏结束！按空格键重新开始",

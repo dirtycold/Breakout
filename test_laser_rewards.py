@@ -1,5 +1,5 @@
 import unittest
-from types import MethodType
+from types import MethodType, SimpleNamespace
 from unittest.mock import patch
 
 import arcade
@@ -87,6 +87,7 @@ class LaserRewardTests(unittest.TestCase):
             "apply_reward",
             "clamp_paddle_to_screen",
             "fire_lasers",
+            "finish_game",
             "reset_active_rewards",
             "release_magnet_ball",
             "resize_paddle",
@@ -108,6 +109,7 @@ class LaserRewardTests(unittest.TestCase):
                 color=LASER_GUN_COLOR,
             ))
         game.laser_bullet_list = arcade.SpriteList()
+        game.reward_list = arcade.SpriteList()
         game.laser_active = False
         game.magnet_active = False
         game.magnet_attached = False
@@ -137,7 +139,7 @@ class LaserRewardTests(unittest.TestCase):
             pass
 
         game = ArcadeGameHarness()
-        for method_name in ("update_laser_guns", "update_lasers"):
+        for method_name in ("finish_game", "update_laser_guns", "update_lasers"):
             setattr(game, method_name, MethodType(getattr(BreakoutGame, method_name), game))
         game.paddle = RoundedRectPaddle(PADDLE_WIDTH, PADDLE_HEIGHT, (52, 152, 219))
         game.paddle.center_x = 400
@@ -150,6 +152,7 @@ class LaserRewardTests(unittest.TestCase):
                 color=LASER_GUN_COLOR,
             ))
         game.laser_bullet_list = arcade.SpriteList()
+        game.reward_list = arcade.SpriteList()
         game.brick_list = arcade.SpriteList()
         brick = RoundedRectBrick(BRICK_WIDTH, BRICK_HEIGHT, (255, 107, 107))
         brick.center_x = 400
@@ -161,6 +164,10 @@ class LaserRewardTests(unittest.TestCase):
         game.laser_bullet_list.append(bullet)
         game.score = 0
         game.game_status = GameStatus.PLAYING
+        game.ball = SimpleNamespace(change_x=0.0, change_y=0.0)
+        game.laser_active = True
+        game.magnet_active = False
+        game.magnet_attached = False
         game.create_explosion = lambda *_args: None
         reward_spawns = []
         game.spawn_reward = lambda *args: reward_spawns.append(args)

@@ -702,6 +702,25 @@ class Ball(QObject):
         self.positionChanged.emit(self._x, self._y)
         self.rotationChanged.emit(self._rotation)
 
+    def prepare_launch(self, paddle_x, paddle_width):
+        """Hold a fresh ball on the paddle until the first left click."""
+        self._active = False
+        self._dx = 0.0
+        self._dy = 0.0
+        self._magnet_offset = 0.0
+        self._magnet_speed = BALL_SPEED
+        self._x = paddle_x + paddle_width / 2
+        self._y = qml_paddle_y() - BALL_RADIUS - BALL_PADDLE_GAP
+        self._set_magnet_attached(True)
+        self.positionChanged.emit(self._x, self._y)
+
+    def stop(self):
+        """Stop and detach the ball when the round has ended."""
+        self._active = False
+        self._dx = 0.0
+        self._dy = 0.0
+        self._set_magnet_attached(False)
+
     def activate_fireball(self):
         """激活火球效果 / Activate fireball effect."""
         self._fireball_active = True
@@ -763,6 +782,7 @@ class Ball(QObject):
         self._dx = self._magnet_speed * math.sin(angle)
         self._dy = -abs(self._magnet_speed * math.cos(angle))
         self._motion.set_spin_from_paddle_hit(relative_hit)
+        self._active = True
         self._set_magnet_attached(False)
         return True
 
@@ -795,6 +815,7 @@ class GameController(QObject):
         self._ball.magnetAttachedChanged.connect(
             lambda _attached: self._update_magnet_effect_visual()
         )
+        self._ball.prepare_launch(self._paddle_x, self._paddle_width)
 
         self._state.brickCount = total_brick_count()
 
@@ -876,7 +897,7 @@ class GameController(QObject):
 
     @Slot()
     def startGame(self):
-        """开始游戏 / Start Game"""
+        """用鼠标左键释放待发小球 / Launch the waiting ball."""
         if self._state.gameStatus == GameStatus.NOT_STARTED:
             self._ball.launch()
             if not self.timer.isActive():
@@ -888,9 +909,7 @@ class GameController(QObject):
     def handleSpace(self):
         """空格键统一处理开始、暂停、继续和重开 / Handle the full SPACE state machine."""
         status = self._state.gameStatus
-        if status == GameStatus.NOT_STARTED:
-            self.startGame()
-        elif status == GameStatus.PLAYING:
+        if status == GameStatus.PLAYING:
             if self._ball.release_from_magnet(self._paddle_width):
                 return
             self._paddle_move_left = False
@@ -902,7 +921,6 @@ class GameController(QObject):
             self._state.gameStatus = GameStatus.PLAYING
         elif status in (GameStatus.GAME_OVER, GameStatus.VICTORY):
             self.resetGame()
-            self.startGame()
 
     @Slot()
     def resetGame(self):
@@ -918,6 +936,7 @@ class GameController(QObject):
         self._laser_model.clear()
         self._set_laser_active(False)
         self._set_magnet_active(False)
+        self._ball.prepare_launch(self._paddle_x, self._paddle_width)
         self._state.score = 0
         self._state.gameStatus = GameStatus.NOT_STARTED
         self._state.message = MESSAGE_START
@@ -988,10 +1007,7 @@ class GameController(QObject):
         elif reward_type == REWARD_TYPE_MAGNET:
             self._set_magnet_active(True)
         elif reward_type == REWARD_TYPE_SKULL:
-            self._state.gameStatus = GameStatus.GAME_OVER
-            self._state.message = MESSAGE_GAME_OVER
-            self._set_laser_active(False)
-            self._set_magnet_active(False)
+            self._finish_game(GameStatus.GAME_OVER, MESSAGE_GAME_OVER)
 
     def _set_laser_active(self, active):
         if self._laser_active == active:
@@ -1004,10 +1020,19 @@ class GameController(QObject):
     def _set_magnet_active(self, active):
         if self._magnet_active == active:
             return
-        if not active:
+        if not active and self._state.gameStatus == GameStatus.PLAYING:
             self._ball.release_from_magnet(self._paddle_width)
         self._magnet_active = active
         self.magnetActiveChanged.emit(active)
+
+    def _finish_game(self, status, message):
+        """Enter a terminal state and remove active play objects."""
+        self._state.gameStatus = status
+        self._state.message = message
+        self._reward_model.clear()
+        self._set_laser_active(False)
+        self._set_magnet_active(False)
+        self._ball.stop()
 
     def _update_magnet_effect_visual(self):
         ball_offset = self._ball._magnet_offset if self._ball.magnetAttached else 0
@@ -1048,6 +1073,9 @@ class GameController(QObject):
     @Slot()
     def handlePrimaryAction(self):
         """释放吸附球；若没有吸附球，则保留鼠标发射激光的行为。"""
+        if self._state.gameStatus == GameStatus.NOT_STARTED:
+            self.startGame()
+            return
         if self._state.gameStatus != GameStatus.PLAYING:
             return
         if not self._ball.release_from_magnet(self._paddle_width):
@@ -1097,8 +1125,10 @@ class GameController(QObject):
                     break
 
             if hit_row is not None:
-                self._destroy_laser_brick(hit_row)
                 self._laser_model.remove_bullet(bullet_row)
+                self._destroy_laser_brick(hit_row)
+                if self._state.gameStatus != GameStatus.PLAYING:
+                    return
             elif bullet["y"] + bullet["height"] < 0:
                 self._laser_model.remove_bullet(bullet_row)
 
@@ -1116,8 +1146,7 @@ class GameController(QObject):
         if reward_type is not None:
             self._reward_model.create_reward(reward_type, center_x, center_y, 0)
         if self._state.brickCount <= 0:
-            self._state.gameStatus = GameStatus.VICTORY
-            self._state.message = MESSAGE_VICTORY
+            self._finish_game(GameStatus.VICTORY, MESSAGE_VICTORY)
 
     def _destroy_brick_group(self, hit_row, direction_x=0, direction_y=0):
         """销毁命中砖块，火球状态下沿运动方向额外销毁砖块 / Destroy fireball path."""
@@ -1143,8 +1172,7 @@ class GameController(QObject):
                 self._reward_model.create_reward(reward_type, center_x, center_y, direction_x)
 
         if self._state.brickCount <= 0:
-            self._state.gameStatus = GameStatus.VICTORY
-            self._state.message = MESSAGE_VICTORY
+            self._finish_game(GameStatus.VICTORY, MESSAGE_VICTORY)
 
     def _check_single_brick_collision(self, brick):
         """检测单个砖块并处理反弹 / Check one brick and bounce the ball."""
@@ -1225,7 +1253,6 @@ class GameController(QObject):
 
             # 检测掉落 / Check if Ball Fell
             if self._ball.isOutOfBounds():
-                self._state.gameStatus = GameStatus.GAME_OVER
-                self._state.message = MESSAGE_GAME_OVER
+                self._finish_game(GameStatus.GAME_OVER, MESSAGE_GAME_OVER)
 
         self._particle_model.update_particles(FIXED_DELTA_TIME)
