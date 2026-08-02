@@ -40,6 +40,10 @@ _force_missing_gstreamer_when_gi_is_incomplete()
 import arcade
 
 from app_icon import set_arcade_window_icon
+from macos_input import enable_first_mouse_for_game_view
+
+
+enable_first_mouse_for_game_view()
 
 
 def _patch_pyglet_fontconfig_memory_faces():
