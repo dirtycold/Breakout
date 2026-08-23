@@ -9,10 +9,20 @@ Window {
     visible: true
     title: config.screenTitleQml
     color: config.backgroundColor
-    property real paddleVisualX: (width - config.paddleWidth) / 2
+    property real paddleVisualX: (config.screenWidth - config.paddleWidth) / 2
+    property int windowedVisibility: Window.Windowed
     property bool playObjectsVisible:
         gameController.state.gameStatus !== gameStatus.GAME_OVER
         && gameController.state.gameStatus !== gameStatus.VICTORY
+
+    function toggleFullscreen() {
+        if (root.visibility === Window.FullScreen) {
+            root.visibility = root.windowedVisibility
+        } else {
+            root.windowedVisibility = root.visibility
+            root.visibility = Window.FullScreen
+        }
+    }
 
     // 游戏配置（从 Python constants 读取）
     GameConfigProvider {
@@ -73,6 +83,12 @@ Window {
         onActivated: gameController.handleCheat(4, true)
     }
 
+    Shortcut {
+        sequences: ["F11", "F"]
+        autoRepeat: false
+        onActivated: root.toggleFullscreen()
+    }
+
     Connections {
         target: gameController
 
@@ -83,7 +99,14 @@ Window {
 
     // 主游戏区域（用于接收键盘输入）
     Item {
-        anchors.fill: parent
+        id: gameCanvas
+        width: config.screenWidth
+        height: config.screenHeight
+        scale: Math.min(root.width / width, root.height / height)
+        transformOrigin: Item.TopLeft
+        x: (root.width - width * scale) / 2
+        y: (root.height - height * scale) / 2
+        clip: true
         focus: true
 
         Keys.onPressed: (event) => {
@@ -130,7 +153,7 @@ Window {
                 }
                 var nextX = Math.max(
                     0,
-                    Math.min(root.width - paddle.width, mouse.x - paddle.width / 2)
+                    Math.min(config.screenWidth - paddle.width, mouse.x - paddle.width / 2)
                 )
                 // Update the visible paddle before crossing the QML/Python boundary.
                 root.paddleVisualX = nextX

@@ -85,6 +85,7 @@ from ball_speed import accelerate_ball_velocity, reset_ball_velocity
 from ball_texture import RainbowBallMotion, create_rainbow_ball_image
 from constants import *
 from fireball_effect import inside_fireball_impact_area
+from game_canvas import game_canvas_viewport
 from magnet_visual import create_magnet_effect_frames, magnet_effect_layout
 from paddle_texture import create_paddle_image
 from reward_visual import (
@@ -339,8 +340,26 @@ class BreakoutGame(arcade.Window):
 
     def __init__(self):
         """初始化游戏 / Initialize the game"""
-        super().__init__(SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_TITLE)
+        super().__init__(
+            SCREEN_WIDTH,
+            SCREEN_HEIGHT,
+            SCREEN_TITLE,
+            resizable=True,
+        )
         set_arcade_window_icon(self)
+
+        self.game_viewport = game_canvas_viewport(self.width, self.height)
+        self.game_camera = arcade.Camera2D(
+            position=(0, 0),
+            projection=arcade.LRBT(0, SCREEN_WIDTH, 0, SCREEN_HEIGHT),
+            viewport=arcade.LBWH(
+                self.game_viewport.x,
+                self.game_viewport.y,
+                self.game_viewport.width,
+                self.game_viewport.height,
+            ),
+            window=self,
+        )
 
         # 设置背景色 / Set background color
         arcade.set_background_color(COLOR_BACKGROUND)
@@ -453,9 +472,14 @@ class BreakoutGame(arcade.Window):
         """Win the short startup race with the launching terminal on macOS."""
         self.activate()
 
+    def toggle_fullscreen(self):
+        """Toggle native fullscreen while keeping the fixed game projection."""
+        self.set_fullscreen(not self.fullscreen)
+
     def on_draw(self):
         """绘制游戏画面 / Draw the game screen"""
         self.clear()
+        self.game_camera.use()
 
         # 绘制砖块 / Draw bricks
         self.brick_list.draw()
@@ -1099,7 +1123,9 @@ class BreakoutGame(arcade.Window):
         if self.handle_cheat(key, modifiers):
             return
 
-        if key == arcade.key.LEFT:
+        if key in (arcade.key.F11, arcade.key.F):
+            self.toggle_fullscreen()
+        elif key == arcade.key.LEFT:
             self.left_pressed = True
         elif key == arcade.key.RIGHT:
             self.right_pressed = True
@@ -1132,6 +1158,15 @@ class BreakoutGame(arcade.Window):
         """鼠标移动事件 / Mouse motion event"""
         if self.game_status == GameStatus.PAUSED:
             return
+        viewport = getattr(
+            self,
+            "game_viewport",
+            game_canvas_viewport(SCREEN_WIDTH, SCREEN_HEIGHT),
+        )
+        game_position = viewport.to_game(x, y)
+        if game_position is None:
+            return
+        x, _ = game_position
         # 使用鼠标X坐标控制挡板位置 / Use mouse X coordinate to control paddle
         self.paddle.center_x = x
 
@@ -1147,11 +1182,35 @@ class BreakoutGame(arcade.Window):
 
     def on_mouse_press(self, x, y, button, modifiers):
         """鼠标左键优先释放吸附球，否则发射双激光 / Release first, otherwise fire."""
-        if button == arcade.MOUSE_BUTTON_LEFT:
+        viewport = getattr(
+            self,
+            "game_viewport",
+            game_canvas_viewport(SCREEN_WIDTH, SCREEN_HEIGHT),
+        )
+        if (
+            button == arcade.MOUSE_BUTTON_LEFT
+            and viewport.contains(x, y)
+        ):
             if self.game_status == GameStatus.NOT_STARTED:
                 self.start_playing()
             elif not self.release_magnet_ball():
                 self.fire_lasers()
+
+    def on_resize(self, width, height):
+        """Keep the logical 800×600 game centered without stretching."""
+        super().on_resize(width, height)
+        self.game_viewport = game_canvas_viewport(width, height)
+        if not hasattr(self, "game_camera"):
+            return
+        self.game_camera.viewport = arcade.LBWH(
+            self.game_viewport.x,
+            self.game_viewport.y,
+            self.game_viewport.width,
+            self.game_viewport.height,
+        )
+        # on_resize() activates Arcade's default camera; restore the fixed
+        # logical camera immediately so expose events cannot draw a stretched frame.
+        self.game_camera.use()
 
     def start_playing(self):
         """发射小球并进入游戏 / Launch the ball and enter play."""
